@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoadBridge — Local Truck-Load & Spare-Capacity Matching Platform</title>
+  <meta name="description" content="AI & Rule-driven spare capacity freight matching on the Pune-Mumbai industrial corridor. Dual weight & volume optimization with idempotent booking and digital coordination passes.">
+  
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#F0F7FF',
+              100: '#E0EFFF',
+              200: '#B9DDFF',
+              300: '#7CC0FF',
+              400: '#369EFF',
+              500: '#007DF0',
+              600: '#005FB8',
+              700: '#0A3B75',
+              800: '#0B2C56',
+              900: '#0A1E3B',
+              950: '#061122',
+            },
+            corridor: {
+              navy: '#0C1B33',
+              slate: '#1E293B',
+              accent: '#2563EB',
+              teal: '#0D9488',
+              emerald: '#059669',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbars and subtle animations */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+
+  <!-- ===================================================================== -->
+  <!-- Top Global Header & Corridor Status Banner -->
+  <!-- ===================================================================== -->
+  <header class="bg-corridor-navy text-white sticky top-0 z-40 border-b border-slate-800 shadow-md">
+    <!-- Top Micro Bar -->
+    <div class="bg-slate-950/80 px-4 py-1 text-xs border-b border-slate-800/80">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center space-x-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="text-slate-300 font-medium">Corridor Operational:</span>
+          <span class="text-white font-semibold">Pune — Mumbai Highway (NH-48 / Express Highway)</span>
+          <span class="text-slate-400">| Stop Gateways: Pune, Chakan, Bhosari, Pimpri, Talegaon, Lonavala, Panvel, Vashi, Thane, Mumbai</span>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="text-slate-300">Active Date: <strong class="text-white">2026-10-20</strong></span>
+          <span class="bg-blue-900/60 text-blue-300 px-2 py-0.5 rounded text-[11px] font-mono border border-blue-700/50">4-Rule Deterministic Engine</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/40 border border-blue-400/30">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xl font-display font-extrabold tracking-tight text-white">Load<span class="text-brand-400">Bridge</span></span>
+              <span class="text-[10px] tracking-wider uppercase font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">v1.0 Live</span>
+            </div>
+            <p class="text-xs text-slate-400 -mt-0.5">Local Truck-Load & Spare Capacity Matching</p>
+          </div>
+        </div>
+
+        <!-- Role Switcher Tabs -->
+        <nav class="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 shadow-inner">
+          <button id="nav-btn-dashboard" onclick="switchTab('dashboard')"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 bg-brand-600 text-white shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            <span>Overview & Trucks</span>
+          </button>
+
+          <button id="nav-btn-shipper" onclick="switchTab('shipper')"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <span>Shipper Portal</span>
+          </button>
+
+          <button id="nav-btn-transporter" onclick="switchTab('transporter')"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            <span>Transporter Portal</span>
+          </button>
+
+          <button id="nav-btn-matches" onclick="switchTab('matches')"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Corridor Matches</span>
+          </button>
+
+          <button id="nav-btn-bookings" onclick="switchTab('bookings')"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span>Passes & Ledger</span>
+            <span id="nav-pass-badge" class="bg-blue-500/30 text-blue-300 text-xs px-1.5 py-0.2 rounded-full font-bold">0</span>
+          </button>
+        </nav>
+
+        <!-- Quick Action / Demo Preload -->
+        <div class="flex items-center space-x-3">
+          <button onclick="loadSampleScenario()" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-900/60 hover:bg-blue-800/80 border border-blue-700/60 text-xs font-semibold text-blue-200 transition-all shadow-sm">
+            <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span>Run Pune-Mumbai Demo</span>
+          </button>
+          <a href="/docs" target="_blank" class="text-xs text-slate-400 hover:text-white transition-colors">API Docs &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Sub-Bar -->
+    <div class="md:hidden flex overflow-x-auto px-4 py-2 space-x-2 bg-slate-900 border-t border-slate-800">
+      <button onclick="switchTab('dashboard')" class="text-xs px-3 py-1.5 rounded font-medium bg-slate-800 text-white whitespace-nowrap">Dashboard</button>
+      <button onclick="switchTab('shipper')" class="text-xs px-3 py-1.5 rounded font-medium bg-slate-800 text-white whitespace-nowrap">Shipper</button>
+      <button onclick="switchTab('transporter')" class="text-xs px-3 py-1.5 rounded font-medium bg-slate-800 text-white whitespace-nowrap">Transporter</button>
+      <button onclick="switchTab('matches')" class="text-xs px-3 py-1.5 rounded font-medium bg-slate-800 text-white whitespace-nowrap">Matches</button>
+      <button onclick="switchTab('bookings')" class="text-xs px-3 py-1.5 rounded font-medium bg-slate-800 text-white whitespace-nowrap">Passes</button>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- Main Content Area Container -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Flash Toast Alerts Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 1: Dashboard & Live Capacity Progress Bars -->
+    <!-- =================================================================== -->
+    <section id="view-dashboard" class="space-y-6">
+      
+      <!-- Corridor Overview Stats Hero -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Card 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Corridor Trucks</p>
+              <h3 id="stat-trucks" class="text-2xl font-extrabold text-slate-900 mt-1">2</h3>
+              <p class="text-xs text-emerald-600 font-medium mt-1">Ready for partial fill</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-blue-50 text-brand-600 flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div id="stat-bar-trucks" class="bg-brand-600 h-full rounded-full transition-all duration-700" style="width: 75%"></div>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Available Weight Pool</p>
+              <h3 id="stat-avail-weight" class="text-2xl font-extrabold text-slate-900 mt-1">1,950 kg</h3>
+              <p id="stat-weight-util" class="text-xs text-slate-500 font-medium mt-1">across corridor fleet</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div id="stat-bar-weight" class="bg-emerald-500 h-full rounded-full transition-all duration-700" style="width: 65%"></div>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Available Volume Pool</p>
+              <h3 id="stat-avail-volume" class="text-2xl font-extrabold text-slate-900 mt-1">13.0 m³</h3>
+              <p id="stat-volume-util" class="text-xs text-slate-500 font-medium mt-1">spare cubic capacity</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div id="stat-bar-volume" class="bg-purple-500 h-full rounded-full transition-all duration-700" style="width: 60%"></div>
+          </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Bookings & Passes</p>
+              <h3 id="stat-confirmed-bookings" class="text-2xl font-extrabold text-slate-900 mt-1">0</h3>
+              <p class="text-xs text-blue-600 font-medium mt-1">Idempotent coordination</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div id="stat-bar-passes" class="bg-amber-500 h-full rounded-full transition-all duration-700" style="width: 20%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Banners -->
+      <div class="bg-gradient-to-r from-corridor-navy via-slate-900 to-blue-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2">
+            <span class="bg-brand-500/30 text-brand-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-brand-500/40">Corridor Freight Optimization</span>
+            <span class="text-slate-400 text-xs">Pune &larr;&rarr; Mumbai Superhighway</span>
+          </div>
+          <h2 class="text-xl font-display font-bold">Have Spare Truck Space or Need Cargo Moved?</h2>
+          <p class="text-sm text-slate-300 max-w-2xl">
+            Our 4-rule matching algorithm matches partial loads by checking <strong>ordered corridor sequence</strong>, 
+            <strong>time window overlap</strong>, <strong>dual weight/volume fit</strong>, and <strong>cargo suitability</strong> with 0-99% calibrated scoring.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <button onclick="switchTab('shipper')" class="px-5 py-2.5 bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>Create Shipment Request</span>
+          </button>
+          <button onclick="switchTab('transporter')" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm rounded-xl border border-slate-600 transition-all">
+            <span>Publish Truck Capacity</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Corridor Fleet Cards Section -->
+      <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div>
+            <h3 class="text-lg font-display font-bold text-slate-900">Live Truck Capacity Ledger</h3>
+            <p class="text-xs text-slate-500">Real-time available spare capacity and ordered route corridors</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="fetchTrucks()" class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-xs flex items-center space-x-1 font-medium transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Refresh Fleet</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="trucks-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <!-- Dynamically populated truck cards -->
+          <div class="col-span-full py-12 text-center text-slate-400">Loading corridor truck capacity...</div>
+        </div>
+      </div>
+
+      <!-- Sample Open Requests Section -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-display font-bold text-slate-900">Corridor Shipment Requests</h3>
+            <p class="text-xs text-slate-500">Open shipper requests seeking matching corridor capacity</p>
+          </div>
+          <button onclick="switchTab('shipper')" class="text-xs font-semibold text-brand-600 hover:text-brand-700">
+            + New Request
+          </button>
+        </div>
+        <div id="requests-list" class="divide-y divide-slate-100">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- VIEW 2: Shipper Portal (Create Request + Box Calculator) -->
+    <!-- =================================================================== -->
+    <section id="view-shipper" class="hidden space-y-6">
+      
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <span class="text-xs font-bold text-brand-600 uppercase tracking-wider">Shipper & Manufacturer Portal</span>
+          <h2 class="text-2xl font-display font-bold text-slate-900 mt-0.5">Submit Shipment Cargo Request</h2>
+          <p class="text-sm text-slate-500">Define your pickup, drop, weight, volume, and timing along the Pune-Mumbai corridor.</p>
+        </div>
+        <button onclick="fillSampleShipperRequest()" class="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold rounded-xl border border-blue-200 transition-all flex items-center space-x-1.5 self-start">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <span>Fill "Pimpri &rarr; Panvel" Sample</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Main Form -->
+        <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+          <h3 class="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-full bg-brand-500 text-white text-xs flex items-center justify-center font-bold">1</span>
+            <span>Cargo & Corridor Parameters</span>
+          </h3>
+
+          <form id="form-shipment" onsubmit="handleCreateShipment(event)" class="space-y-4">
+            
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Shipper Organization / Business Name</label>
+              <input type="text" id="req-shipper-name" required placeholder="e.g. Pimpri Auto Spares Pvt Ltd"
+                class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition-all">
+            </div>
+
+            <!-- Route Stop Dropdowns with Swap Button -->
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600 uppercase">Corridor Route Hubs</span>
+                <span id="route-error-badge" class="hidden text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                  Pickup and Drop cannot be identical!
+                </span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
+                <div class="sm:col-span-2">
+                  <label class="block text-[11px] text-slate-500 mb-0.5">Pickup Location (Stop A)</label>
+                  <select id="req-pickup" onchange="validateStopsLive()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 font-medium">
+                    <option value="Pune">Pune</option>
+                    <option value="Chakan">Chakan</option>
+                    <option value="Bhosari">Bhosari</option>
+                    <option value="Pimpri" selected>Pimpri</option>
+                    <option value="Talegaon">Talegaon</option>
+                    <option value="Lonavala">Lonavala</option>
+                    <option value="Khalapur">Khalapur</option>
+                    <option value="Panvel">Panvel</option>
+                    <option value="Vashi">Vashi</option>
+                    <option value="Thane">Thane</option>
+                    <option value="Mumbai">Mumbai</option>
+                  </select>
+                </div>
+
+                <div class="flex justify-center sm:col-span-1 pt-3 sm:pt-0">
+                  <button type="button" onclick="swapShipmentStops()" title="Swap Pickup & Drop" class="p-2 rounded-full hover:bg-slate-200 text-slate-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                  </button>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label class="block text-[11px] text-slate-500 mb-0.5">Drop Destination (Stop B)</label>
+                  <select id="req-drop" onchange="validateStopsLive()" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-brand-500 font-medium">
+                    <option value="Pune">Pune</option>
+                    <option value="Chakan">Chakan</option>
+                    <option value="Bhosari">Bhosari</option>
+                    <option value="Pimpri">Pimpri</option>
+                    <option value="Talegaon">Talegaon</option>
+                    <option value="Lonavala">Lonavala</option>
+                    <option value="Khalapur">Khalapur</option>
+                    <option value="Panvel" selected>Panvel</option>
+                    <option value="Vashi">Vashi</option>
+                    <option value="Thane">Thane</option>
+                    <option value="Mumbai">Mumbai</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Date & Time Window -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Service Date</label>
+                <input type="date" id="req-date" required value="2026-10-20"
+                  class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-brand-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ready From (Start)</label>
+                <input type="time" id="req-time-start" required value="08:00"
+                  class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-brand-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Deliver By (End)</label>
+                <input type="time" id="req-time-end" required value="10:30"
+                  class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-brand-500">
+              </div>
+            </div>
+
+            <!-- Weight & Volume (Live linked to Box Calculator) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Cargo Weight (kg)</label>
+                <div class="relative">
+                  <input type="number" id="req-weight" step="1" min="1" required value="600"
+                    class="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-slate-200 focus:border-brand-500 pr-12">
+                  <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">kg</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Must be strictly &gt; 0 kg</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Cargo Volume (m³)</label>
+                <div class="relative">
+                  <input type="number" id="req-volume" step="0.1" min="0.05" required value="3.5"
+                    class="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-slate-200 focus:border-brand-500 pr-12">
+                  <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">m³</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Use the Quick Calculator &rarr;</p>
+              </div>
+            </div>
+
+            <!-- Cargo Category & Vehicle Type -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Cargo Category</label>
+                <select id="req-cargo-type" class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+                  <option value="Auto Parts">Auto Parts & Ancillaries</option>
+                  <option value="Dry Cartons">Dry Cartons / Packaging</option>
+                  <option value="Textiles">Textiles & Garments</option>
+                  <option value="FMCG">FMCG & Consumer Goods</option>
+                  <option value="Electronics">Electronics & Hardware</option>
+                  <option value="Pharmaceuticals">Pharmaceuticals</option>
+                  <option value="Machinery">Industrial Machinery</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Required Vehicle Body</label>
+                <select id="req-vehicle-body" class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+                  <option value="Closed Container">Closed Container (Weatherproof)</option>
+                  <option value="Open Body / Tarpaulin">Open Body / Tarpaulin</option>
+                  <option value="Flatbed">Flatbed Truck</option>
+                  <option value="Any">Any Standard Vehicle</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-2">
+              <button type="submit" id="btn-submit-shipment" class="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <span>Save Request & Find Compatible Trucks</span>
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- Right Side: Quick Box-to-Volume Calculator Widget -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-gradient-to-br from-slate-900 to-corridor-navy text-white rounded-2xl p-6 shadow-md border border-slate-700 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-brand-500/30 text-brand-400 flex items-center justify-center">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </div>
+                <div>
+                  <h4 class="font-display font-bold text-sm">Quick Box-to-Volume Calculator</h4>
+                  <p class="text-[11px] text-slate-400">Carton Count &rarr; Cubic Meters & Weight</p>
+                </div>
+              </div>
+              <span class="text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">Live Tool</span>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Don't know the exact cubic meters? Enter carton quantity and select standard industrial packaging dimensions:
+            </p>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[11px] text-slate-300 font-semibold mb-1">Standard Box Dimension Preset</label>
+                <select id="calc-preset" onchange="runBoxCalculator()" class="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-brand-400">
+                  <option value="auto-spares">Auto Spares Carton (45 × 35 × 30 cm | ~12 kg / box)</option>
+                  <option value="fmcg-medium">FMCG Master Box (50 × 40 × 40 cm | ~15 kg / box)</option>
+                  <option value="bulk-industrial">Bulk Heavy Crate (60 × 50 × 50 cm | ~25 kg / box)</option>
+                  <option value="textile-bale">Textile Bundle (70 × 50 × 40 cm | ~18 kg / box)</option>
+                  <option value="custom">Custom Dimensions (Enter below)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] text-slate-300 font-semibold mb-1">Total Number of Cartons / Boxes</label>
+                <div class="flex items-center space-x-2">
+                  <input type="number" id="calc-count" min="1" max="1000" value="50" oninput="runBoxCalculator()"
+                    class="w-full px-3.5 py-2 text-sm font-bold rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-brand-400">
+                  <div class="flex space-x-1">
+                    <button type="button" onclick="setBoxCount(25)" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono">25</button>
+                    <button type="button" onclick="setBoxCount(50)" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono">50</button>
+                    <button type="button" onclick="setBoxCount(100)" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono">100</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Custom Dimension Row (Shown when custom is selected) -->
+              <div id="calc-custom-row" class="hidden grid-cols-3 gap-2">
+                <div>
+                  <span class="text-[10px] text-slate-400">Length (cm)</span>
+                  <input type="number" id="calc-len" value="45" oninput="runBoxCalculator()" class="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-white">
+                </div>
+                <div>
+                  <span class="text-[10px] text-slate-400">Width (cm)</span>
+                  <input type="number" id="calc-wid" value="35" oninput="runBoxCalculator()" class="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-white">
+                </div>
+                <div>
+                  <span class="text-[10px] text-slate-400">Height (cm)</span>
+                  <input type="number" id="calc-hgt" value="30" oninput="runBoxCalculator()" class="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-white">
+                </div>
+              </div>
+
+              <!-- Live Calculated Output Card -->
+              <div class="bg-slate-800/90 rounded-xl p-4 border border-slate-700/80 space-y-2">
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Calculated Volume:</span>
+                  <span id="calc-result-vol" class="text-emerald-400 font-mono font-bold text-sm">3.50 m³</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Estimated Total Weight:</span>
+                  <span id="calc-result-wt" class="text-blue-400 font-mono font-bold text-sm">600 kg</span>
+                </div>
+                <div class="text-[11px] text-slate-400 pt-1 border-t border-slate-700/60 flex items-center justify-between">
+                  <span>Single Box Volume:</span>
+                  <span id="calc-single-vol" class="font-mono text-slate-300">0.07 m³</span>
+                </div>
+              </div>
+
+              <!-- 1-Click Apply Button -->
+              <button type="button" onclick="applyCalculatorToForm()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>Apply Values to Shipment Request Form</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Informational Card -->
+          <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 text-xs text-blue-900 space-y-1.5">
+            <h5 class="font-bold flex items-center space-x-1">
+              <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>How 4-Rule Matching Works</span>
+            </h5>
+            <p class="text-blue-800 leading-relaxed">
+              When you submit your request, our engine inspects all trucks travelling that day. It enforces ordered corridor stops (no reverse directions), ensures time windows overlap, validates dual capacity limits, and verifies vehicle suitability.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- VIEW 3: Transporter Portal (Publish Capacity) -->
+    <!-- =================================================================== -->
+    <section id="view-transporter" class="hidden space-y-6">
+      
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Fleet Operator Portal</span>
+          <h2 class="text-2xl font-display font-bold text-slate-900 mt-0.5">Publish Available Spare Capacity</h2>
+          <p class="text-sm text-slate-500">Monetize unutilized truck space on your scheduled corridor trips.</p>
+        </div>
+        <button onclick="fillSampleTruckPublish()" class="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold rounded-xl border border-emerald-200 transition-all flex items-center space-x-1.5 self-start">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <span>Fill "Kalyani 19ft" Sample</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-4xl mx-auto space-y-6">
+        
+        <form id="form-truck" onsubmit="handlePublishTruck(event)" class="space-y-6">
+          
+          <!-- Basic Info -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Transporter / Fleet Owner Name</label>
+              <input type="text" id="trk-transporter-name" required placeholder="e.g. Shinde Transport Co."
+                class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Driver / Dispatcher Contact Number</label>
+              <input type="tel" id="trk-phone" required placeholder="e.g. +91 98230-44101"
+                class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500">
+              <p class="text-[11px] text-slate-400 mt-0.5">Privacy Protected: Phone is masked until booking confirmation.</p>
+            </div>
+          </div>
+
+          <!-- Vehicle Body Type -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Vehicle Specification</label>
+              <select id="trk-vehicle-body" class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+                <option value="14ft Closed Container">14ft Closed Container (Eicher / Tata 407)</option>
+                <option value="17ft Closed Container" selected>17ft Closed Container (Tata 1109 / Ashok Leyland)</option>
+                <option value="19ft Closed Container">19ft Closed Container (Tata 1412)</option>
+                <option value="22ft Closed Container">22ft High-Cube Container</option>
+                <option value="Open Body / Tarpaulin">Open Body with Tarpaulin Covering</option>
+                <option value="Flatbed">Flatbed Trailer</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Corridor Service Date</label>
+              <input type="date" id="trk-date" required value="2026-10-20"
+                class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500">
+            </div>
+          </div>
+
+          <!-- Route Stops Builder -->
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="block text-xs font-bold text-slate-800 uppercase">Ordered Route Corridor Stops</label>
+                <p class="text-[11px] text-slate-500">Stops must be in the exact order of forward travel along the corridor.</p>
+              </div>
+              <span id="route-stops-count" class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">5 Stops</span>
+            </div>
+
+            <!-- Active Stops Chips -->
+            <div id="truck-stops-chips" class="flex flex-wrap items-center gap-2 p-2.5 bg-white rounded-lg border border-slate-200 min-h-[46px]">
+              <!-- Populated by JS -->
+            </div>
+
+            <!-- Quick Add Pre-set Stops -->
+            <div class="space-y-1">
+              <span class="text-[11px] text-slate-400 font-medium">Quick add corridor hub:</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="addRouteStop('Pune')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Pune</button>
+                <button type="button" onclick="addRouteStop('Chakan')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Chakan</button>
+                <button type="button" onclick="addRouteStop('Bhosari')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Bhosari</button>
+                <button type="button" onclick="addRouteStop('Pimpri')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Pimpri</button>
+                <button type="button" onclick="addRouteStop('Talegaon')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Talegaon</button>
+                <button type="button" onclick="addRouteStop('Lonavala')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Lonavala</button>
+                <button type="button" onclick="addRouteStop('Panvel')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Panvel</button>
+                <button type="button" onclick="addRouteStop('Vashi')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Vashi</button>
+                <button type="button" onclick="addRouteStop('Thane')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Thane</button>
+                <button type="button" onclick="addRouteStop('Mumbai')" class="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-700">+ Mumbai</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Time Window & Capacity -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Departure (Start)</label>
+              <input type="time" id="trk-time-start" required value="09:00"
+                class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Arrival Window (End)</label>
+              <input type="time" id="trk-time-end" required value="12:00"
+                class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Spare Weight (kg)</label>
+              <input type="number" id="trk-avail-weight" step="50" min="50" required value="1000"
+                class="w-full px-3 py-2 text-sm font-semibold rounded-xl border border-slate-200">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Spare Volume (m³)</label>
+              <input type="number" id="trk-avail-volume" step="0.5" min="0.5" required value="7.0"
+                class="w-full px-3 py-2 text-sm font-semibold rounded-xl border border-slate-200">
+            </div>
+          </div>
+
+          <!-- Allowed Cargo Checkboxes -->
+          <div>
+            <label class="block text-xs font-bold text-slate-800 uppercase mb-2">Permitted Cargo Categories</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Auto Parts" checked class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Auto Parts</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Dry Cartons" checked class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Dry Cartons</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Textiles" checked class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Textiles</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="FMCG" class="rounded text-brand-600 focus:ring-brand-500">
+                <span>FMCG</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Electronics" class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Electronics</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Pharmaceuticals" class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Pharma</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100">
+                <input type="checkbox" name="trk-cargo" value="Machinery" class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Machinery</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <div class="pt-4 border-t border-slate-100">
+            <button type="submit" id="btn-submit-truck" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              <span>Publish Truck Capacity to Corridor</span>
+            </button>
+          </div>
+
+        </form>
+
+      </div>
+
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- VIEW 4: Ranked Compatible Matches View (4 Rules + Fit Score) -->
+    <!-- =================================================================== -->
+    <section id="view-matches" class="hidden space-y-6">
+      
+      <!-- Top Match Filter & Selector -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold text-brand-600 uppercase tracking-wider">Matching Engine Results</span>
+          <h2 class="text-2xl font-display font-bold text-slate-900 mt-0.5">Compatible Corridor Capacity</h2>
+          <p class="text-sm text-slate-500">Ranked by calibrated operational Fit Score (0-99%).</p>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <label class="text-xs text-slate-500 font-semibold uppercase">Evaluating Request:</label>
+          <select id="matches-request-select" onchange="loadMatchesForSelectedRequest()" class="px-3.5 py-2 text-sm font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:border-brand-500">
+            <option value="REQ-01">REQ-01 (Pimpri &rarr; Panvel, 600kg, 3.5m³)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Current Request Quick Specs Bar -->
+      <div id="match-req-banner" class="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center space-x-3">
+          <span class="font-bold text-brand-400 font-mono text-sm" id="banner-req-id">REQ-01</span>
+          <span class="text-slate-300" id="banner-req-shipper">Pimpri Auto Spares</span>
+          <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300" id="banner-req-route">Pimpri &rarr; Panvel</span>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="text-slate-300">Date: <strong class="text-white" id="banner-req-date">2026-10-20</strong></span>
+          <span class="text-slate-300">Window: <strong class="text-white" id="banner-req-time">08:00 - 10:30</strong></span>
+          <span class="text-emerald-400 font-mono font-semibold" id="banner-req-cargo">600 kg / 3.5 m³ (Auto Parts)</span>
+        </div>
+      </div>
+
+      <!-- Matches Results List -->
+      <div id="matches-container" class="space-y-4">
+        <!-- Rendered dynamically -->
+        <div class="p-12 text-center text-slate-400">Loading compatible corridor matches...</div>
+      </div>
+
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- VIEW 5: Bookings & Digital Coordination Pass Ledger -->
+    <!-- =================================================================== -->
+    <section id="view-bookings" class="hidden space-y-6">
+      
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Audit & Dispatch Control</span>
+          <h2 class="text-2xl font-display font-bold text-slate-900 mt-0.5">Digital Coordination Pass Ledger</h2>
+          <p class="text-sm text-slate-500">Atomic capacity bookings with unmasked driver contacts and pre-departure cancel protection.</p>
+        </div>
+        <button onclick="fetchBookings()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl text-slate-700 transition-colors flex items-center space-x-1.5 self-start">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Refresh Ledger</span>
+        </button>
+      </div>
+
+      <div id="bookings-ledger-container" class="space-y-4">
+        <!-- Dynamically rendered booking passes -->
+        <div class="p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+          No bookings created yet. Confirm a match from the "Corridor Matches" tab.
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: Digital Coordination Pass & Booking Confirmation Detail -->
+  <!-- ===================================================================== -->
+  <div id="pass-modal" class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-xl w-full border border-slate-300 shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Pass Header -->
+      <div class="bg-gradient-to-r from-corridor-navy via-slate-900 to-blue-950 text-white p-6 relative">
+        <button onclick="closePassModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs uppercase tracking-widest text-emerald-300 font-bold">Official Freight Coordination Pass</span>
+        </div>
+        <h3 id="modal-pass-title" class="text-xl font-display font-extrabold mt-1">Confirmed Corridor Booking</h3>
+        <p class="text-xs text-slate-300">Authorized for Highway Checkpoint & Loading Bay Gate Entry</p>
+      </div>
+
+      <!-- Pass Body -->
+      <div class="p-6 space-y-5" id="modal-pass-content">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+        <button onclick="window.print()" class="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center space-x-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          <span>Print Pass</span>
+        </button>
+        <button onclick="closePassModal()" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- Footer -->
+  <!-- ===================================================================== -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 space-y-1">
+      <p class="font-semibold text-slate-700">LoadBridge — Local Truck-Load & Spare-Capacity Matching Platform</p>
+      <p>Demonstrating 4-Rule Matching Engine, Fit-Score Optimization, Idempotent Booking & Capacity Restoration.</p>
+      <p class="text-[11px] text-slate-400">Target Corridor: Pune — Pimpri — Lonavala — Panvel — Mumbai (NH-48)</p>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- JavaScript Application Logic -->
+  <!-- ===================================================================== -->
+  <script>
+    // State Store in Browser
+    let appTrucks = [];
+    let appRequests = [];
+    let appBookings = [];
+    let currentTruckStops = ["Pune", "Pimpri", "Lonavala", "Panvel", "Mumbai"];
+    let activeTab = "dashboard";
+
+    // -----------------------------------------------------------------------
+    // Initialization
+    // -----------------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", () => {
+      renderTruckStopsChips();
+      runBoxCalculator();
+      fetchStats();
+      fetchTrucks();
+      fetchRequests();
+      fetchBookings();
+    });
+
+    // -----------------------------------------------------------------------
+    // Tab Navigation
+    // -----------------------------------------------------------------------
+    function switchTab(tabId) {
+      activeTab = tabId;
+      const views = ["dashboard", "shipper", "transporter", "matches", "bookings"];
+      
+      views.forEach(v => {
+        const viewEl = document.getElementById(`view-${v}`);
+        const btnEl = document.getElementById(`nav-btn-${v}`);
+        
+        if (v === tabId) {
+          viewEl.classList.remove("hidden");
+          if (btnEl) {
+            btnEl.classList.add("bg-brand-600", "text-white", "shadow-sm");
+            btnEl.classList.remove("text-slate-300", "hover:bg-slate-800");
+          }
+        } else {
+          viewEl.classList.add("hidden");
+          if (btnEl) {
+            btnEl.classList.remove("bg-brand-600", "text-white", "shadow-sm");
+            btnEl.classList.add("text-slate-300", "hover:bg-slate-800");
+          }
+        }
+      });
+
+      if (tabId === "matches") {
+        loadMatchesForSelectedRequest();
+      } else if (tabId === "dashboard") {
+        fetchStats();
+        fetchTrucks();
+      } else if (tabId === "bookings") {
+        fetchBookings();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // -----------------------------------------------------------------------
+    // Toast Notifications
+    // -----------------------------------------------------------------------
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      
+      const colors = {
+        success: "bg-emerald-900 border-emerald-700 text-emerald-100",
+        error: "bg-red-900 border-red-700 text-red-100",
+        info: "bg-blue-900 border-blue-700 text-blue-100",
+      };
+
+      toast.className = `p-4 rounded-xl shadow-xl border text-xs font-semibold flex items-center space-x-2 transition-all transform duration-300 ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${type === 'error' ? 'bg-red-400' : 'bg-emerald-400'}"></span>
+        <span>${message}</span>
+      `;
+      
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // -----------------------------------------------------------------------
+    // API Fetch Helpers
+    // -----------------------------------------------------------------------
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/stats");
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        document.getElementById("stat-trucks").innerText = data.active_trucks;
+        document.getElementById("stat-avail-weight").innerText = `${data.total_available_weight_kg.toLocaleString()} kg`;
+        document.getElementById("stat-weight-util").innerText = `${data.weight_utilization_pct}% fleet payload utilized`;
+        document.getElementById("stat-avail-volume").innerText = `${data.total_available_volume_m3} m³`;
+        document.getElementById("stat-volume-util").innerText = `${data.volume_utilization_pct}% volume capacity filled`;
+        document.getElementById("stat-confirmed-bookings").innerText = data.confirmed_bookings;
+      } catch (err) {
+        console.error("Failed to fetch stats", err);
+      }
+    }
+
+    async function fetchTrucks() {
+      try {
+        const res = await fetch("/api/trucks");
+        if (!res.ok) return;
+        appTrucks = await res.json();
+        renderTrucksGrid(appTrucks);
+      } catch (err) {
+        console.error("Failed to fetch trucks", err);
+      }
+    }
+
+    async function fetchRequests() {
+      try {
+        const res = await fetch("/api/requests");
+        if (!res.ok) return;
+        appRequests = await res.json();
+        renderRequestsList(appRequests);
+        updateMatchesDropdown(appRequests);
+      } catch (err) {
+        console.error("Failed to fetch requests", err);
+      }
+    }
+
+    async function fetchBookings() {
+      try {
+        const res = await fetch("/api/bookings");
+        if (!res.ok) return;
+        appBookings = await res.json();
+        renderBookingsLedger(appBookings);
+        const badge = document.getElementById("nav-pass-badge");
+        if (badge) badge.innerText = appBookings.filter(b => b.status === "CONFIRMED").length;
+      } catch (err) {
+        console.error("Failed to fetch bookings", err);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Render Trucks Grid with Live Progress Bars
+    // -----------------------------------------------------------------------
+    function renderTrucksGrid(trucks) {
+      const container = document.getElementById("trucks-grid");
+      if (!trucks.length) {
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400">No trucks currently listed.</div>`;
+        return;
+      }
+
+      container.innerHTML = trucks.map(trk => {
+        const wtPct = Math.round(((trk.total_weight_kg - trk.available_weight_kg) / trk.total_weight_kg) * 100);
+        const volPct = Math.round(((trk.total_volume_m3 - trk.available_volume_m3) / trk.total_volume_m3) * 100);
+
+        const routeBadges = trk.route_stops.map((stop, i) => `
+          <span class="inline-flex items-center text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+            ${stop}
+          </span>
+          ${i < trk.route_stops.length - 1 ? '<span class="text-slate-300 text-xs font-bold">&rarr;</span>' : ''}
+        `).join('');
+
+        const cargoTags = trk.allowed_cargo.map(c => `
+          <span class="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium border border-blue-200">
+            ${c}
+          </span>
+        `).join('');
+
+        return `
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+            
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="font-mono font-bold text-sm text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">${trk.id}</span>
+                  <h4 class="font-display font-bold text-slate-900">${trk.transporter_name}</h4>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">${trk.vehicle_body}</p>
+              </div>
+
+              <div class="text-right">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${trk.status === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-800' : (trk.status === 'PARTIAL' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700')}">
+                  ${trk.status}
+                </span>
+                <p class="text-[11px] font-mono text-slate-400 mt-1">${trk.masked_phone}</p>
+              </div>
+            </div>
+
+            <!-- Route Stop Corridor Sequence -->
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+              <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scheduled Corridor Route</span>
+              <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                ${routeBadges}
+              </div>
+            </div>
+
+            <!-- Capacity Progress Bars (Weight & Volume) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <!-- Weight Bar -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Spare Weight:</span>
+                  <span class="font-mono font-bold text-slate-800">${trk.available_weight_kg} kg <span class="text-slate-400 font-normal">/ ${trk.total_weight_kg}kg</span></span>
+                </div>
+                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: ${100 - wtPct}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400">
+                  <span>${wtPct}% Booked</span>
+                  <span>${100 - wtPct}% Available</span>
+                </div>
+              </div>
+
+              <!-- Volume Bar -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Spare Volume:</span>
+                  <span class="font-mono font-bold text-slate-800">${trk.available_volume_m3} m³ <span class="text-slate-400 font-normal">/ ${trk.total_volume_m3}m³</span></span>
+                </div>
+                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div class="bg-brand-500 h-full rounded-full transition-all duration-500" style="width: ${100 - volPct}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400">
+                  <span>${volPct}% Booked</span>
+                  <span>${100 - volPct}% Available</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Operational Timing & Allowed Cargo -->
+            <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center space-x-1 text-slate-600">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>${trk.date} &bull; ${trk.time_window_start} - ${trk.time_window_end}</span>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                ${cargoTags}
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    // -----------------------------------------------------------------------
+    // Render Open Shipment Requests List
+    // -----------------------------------------------------------------------
+    function renderRequestsList(requests) {
+      const container = document.getElementById("requests-list");
+      if (!requests.length) {
+        container.innerHTML = `<div class="py-6 text-center text-slate-400 text-xs">No active shipment requests.</div>`;
+        return;
+      }
+
+      container.innerHTML = requests.map(r => `
+        <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="font-mono font-bold text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">${r.id}</span>
+              <span class="font-bold text-sm text-slate-900">${r.shipper_name}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-semibold ${r.status === 'OPEN' ? 'bg-blue-100 text-blue-800' : (r.status === 'BOOKED' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700')}">
+                ${r.status}
+              </span>
+            </div>
+            <p class="text-xs text-slate-600">
+              <strong>${r.pickup_stop}</strong> &rarr; <strong>${r.drop_stop}</strong> &bull;
+              <span>${r.date} (${r.time_window_start} - ${r.time_window_end})</span>
+            </p>
+          </div>
+
+          <div class="flex items-center space-x-4">
+            <div class="text-right">
+              <span class="font-mono font-bold text-xs text-emerald-600">${r.weight_kg} kg</span>
+              <span class="text-slate-300">|</span>
+              <span class="font-mono font-bold text-xs text-blue-600">${r.volume_m3} m³</span>
+              <p class="text-[11px] text-slate-400">${r.cargo_type}</p>
+            </div>
+            <button onclick="inspectMatchesForRequest('${r.id}')" class="px-3.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold text-xs rounded-xl border border-brand-200 transition-colors">
+              Find Matches &rarr;
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateMatchesDropdown(requests) {
+      const select = document.getElementById("matches-request-select");
+      if (!select) return;
+      select.innerHTML = requests.map(r => `
+        <option value="${r.id}">${r.id}: ${r.shipper_name} (${r.pickup_stop} &rarr; ${r.drop_stop}, ${r.weight_kg}kg)</option>
+      `).join('');
+    }
+
+    function inspectMatchesForRequest(reqId) {
+      const select = document.getElementById("matches-request-select");
+      if (select) select.value = reqId;
+      switchTab("matches");
+    }
+
+    // -----------------------------------------------------------------------
+    // VIEW 4: Ranked Matches Evaluation
+    // -----------------------------------------------------------------------
+    async function loadMatchesForSelectedRequest() {
+      const select = document.getElementById("matches-request-select");
+      const reqId = select ? select.value : "REQ-01";
+      const container = document.getElementById("matches-container");
+
+      if (!reqId) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400">No request selected.</div>`;
+        return;
+      }
+
+      // Update banner with request details
+      const reqObj = appRequests.find(r => r.id === reqId);
+      if (reqObj) {
+        document.getElementById("banner-req-id").innerText = reqObj.id;
+        document.getElementById("banner-req-shipper").innerText = reqObj.shipper_name;
+        document.getElementById("banner-req-route").innerHTML = `${reqObj.pickup_stop} &rarr; ${reqObj.drop_stop}`;
+        document.getElementById("banner-req-date").innerText = reqObj.date;
+        document.getElementById("banner-req-time").innerText = `${reqObj.time_window_start} - ${reqObj.time_window_end}`;
+        document.getElementById("banner-req-cargo").innerText = `${reqObj.weight_kg} kg / ${reqObj.volume_m3} m³ (${reqObj.cargo_type})`;
+      }
+
+      container.innerHTML = `<div class="p-12 text-center text-slate-400">Evaluating 4-Rule Engine across corridor fleet...</div>`;
+
+      try {
+        const res = await fetch(`/api/matches/${reqId}`);
+        if (!res.ok) {
+          const errData = await res.json();
+          container.innerHTML = `<div class="p-8 text-center text-red-500 font-semibold bg-red-50 rounded-xl border border-red-200">${errData.detail || 'Failed to fetch matches'}</div>`;
+          return;
+        }
+
+        const matches = await res.json();
+        renderMatchesCards(matches, reqId);
+      } catch (err) {
+        container.innerHTML = `<div class="p-8 text-center text-red-500">Error loading matches: ${err.message}</div>`;
+      }
+    }
+
+    function renderMatchesCards(matches, reqId) {
+      const container = document.getElementById("matches-container");
+      if (!matches.length) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">No trucks currently listed on the corridor.</div>`;
+        return;
+      }
+
+      container.innerHTML = matches.map((m, idx) => {
+        const isComp = m.evaluation.is_compatible;
+        const ev = m.evaluation;
+        const trk = m.truck;
+        const req = m.request;
+
+        // Color coding for score
+        let scoreBg = "bg-emerald-600 text-white";
+        if (m.fit_score < 75) scoreBg = "bg-blue-600 text-white";
+        if (!isComp) scoreBg = "bg-slate-300 text-slate-600";
+
+        // Badges for 4 rules
+        const rule1Badge = ev.rule_1_route 
+          ? `<span class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_1_detail}">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Rule 1: Ordered Corridor</span>
+            </span>`
+          : `<span class="inline-flex items-center space-x-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_1_detail}">
+              <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span>Rule 1: Corridor Stop Failed</span>
+            </span>`;
+
+        const rule2Badge = ev.rule_2_time
+          ? `<span class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_2_detail}">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Rule 2: Time Window (${m.score_breakdown.time_overlap_mins}m overlap)</span>
+            </span>`
+          : `<span class="inline-flex items-center space-x-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_2_detail}">
+              <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span>Rule 2: Time Disjoint</span>
+            </span>`;
+
+        const rule3Badge = ev.rule_3_capacity
+          ? `<span class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_3_detail}">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Rule 3: Dual Capacity Fits</span>
+            </span>`
+          : `<span class="inline-flex items-center space-x-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_3_detail}">
+              <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span>Rule 3: Capacity Deficit</span>
+            </span>`;
+
+        const rule4Badge = ev.rule_4_suitability
+          ? `<span class="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_4_detail}">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Rule 4: Cargo & Vehicle Suitability</span>
+            </span>`
+          : `<span class="inline-flex items-center space-x-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-semibold" title="${ev.rule_4_detail}">
+              <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span>Rule 4: Incompatible Cargo/Body</span>
+            </span>`;
+
+        // Remaining capacity preview after this booking
+        const afterWt = Math.max(0, trk.available_weight_kg - req.weight_kg);
+        const afterVol = Math.max(0, (trk.available_volume_m3 - req.volume_m3).toFixed(2));
+
+        return `
+          <div class="bg-white rounded-2xl p-6 border ${isComp ? 'border-slate-200 shadow-sm hover:border-brand-300' : 'border-slate-200/60 opacity-80 bg-slate-50/50'} transition-all space-y-4">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-start space-x-3">
+                <!-- Fit Score Badge -->
+                <div class="w-16 h-16 rounded-2xl ${scoreBg} flex flex-col items-center justify-center font-display shadow-md">
+                  <span class="text-xl font-extrabold leading-none">${m.fit_score}%</span>
+                  <span class="text-[9px] font-semibold uppercase tracking-wider mt-0.5">${isComp ? 'Fit Score' : 'Incompat'}</span>
+                </div>
+
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span class="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded">${trk.id}</span>
+                    <h3 class="font-display font-bold text-base text-slate-900">${trk.transporter_name}</h3>
+                    <span class="text-xs text-slate-400">|</span>
+                    <span class="text-xs font-medium text-slate-600">${trk.vehicle_body}</span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1">
+                    Route: <span class="font-semibold text-slate-700">${trk.route_stops.join(' &rarr; ')}</span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- Action Button -->
+              <div>
+                ${isComp ? `
+                  <button onclick="handleConfirmBooking('${req.id}', '${trk.id}')" class="w-full sm:w-auto px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Confirm Booking & Issue Pass</span>
+                  </button>
+                ` : `
+                  <span class="inline-block px-4 py-2 bg-slate-100 text-slate-500 font-semibold text-xs rounded-xl border border-slate-200">
+                    Operational Constraint Failed
+                  </span>
+                `}
+              </div>
+            </div>
+
+            <!-- 4 Rule Badges Row -->
+            <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              ${rule1Badge}
+              ${rule2Badge}
+              ${rule3Badge}
+              ${rule4Badge}
+            </div>
+
+            <!-- Score Metrics & Capacity Breakdown -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs">
+              <div>
+                <span class="text-slate-400 text-[11px] block">Weight Fill Ratio</span>
+                <span class="font-bold text-slate-800">${m.score_breakdown.weight_fill_pct}%</span>
+                <span class="text-[10px] text-slate-500 block">${req.weight_kg}kg of ${trk.available_weight_kg}kg</span>
+              </div>
+
+              <div>
+                <span class="text-slate-400 text-[11px] block">Volume Fill Ratio</span>
+                <span class="font-bold text-slate-800">${m.score_breakdown.volume_fill_pct}%</span>
+                <span class="text-[10px] text-slate-500 block">${req.volume_m3}m³ of ${trk.available_volume_m3}m³</span>
+              </div>
+
+              <div>
+                <span class="text-slate-400 text-[11px] block">Time Alignment</span>
+                <span class="font-bold text-slate-800">${m.score_breakdown.time_overlap_mins} mins</span>
+                <span class="text-[10px] text-slate-500 block">${m.overlap_window || 'No overlap'}</span>
+              </div>
+
+              <div>
+                <span class="text-slate-400 text-[11px] block">After Booking Spare</span>
+                <span class="font-bold text-emerald-700 font-mono">${afterWt} kg / ${afterVol} m³</span>
+                <span class="text-[10px] text-slate-500 block">Remaining available</span>
+              </div>
+            </div>
+
+            ${!isComp ? `
+              <div class="text-xs text-red-600 bg-red-50/70 p-3 rounded-lg border border-red-100 space-y-1">
+                <p class="font-bold">Operational Constraint Explanations:</p>
+                <ul class="list-disc list-inside space-y-0.5 text-[11px]">
+                  ${!ev.rule_1_route ? `<li>${ev.rule_1_detail}</li>` : ''}
+                  ${!ev.rule_2_time ? `<li>${ev.rule_2_detail}</li>` : ''}
+                  ${!ev.rule_3_capacity ? `<li>${ev.rule_3_detail}</li>` : ''}
+                  ${!ev.rule_4_suitability ? `<li>${ev.rule_4_detail}</li>` : ''}
+                </ul>
+              </div>
+            ` : ''}
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    // -----------------------------------------------------------------------
+    // Booking Confirmation & Pre-Departure Cancellation
+    // -----------------------------------------------------------------------
+    async function handleConfirmBooking(requestId, truckId) {
+      try {
+        const res = await fetch("/api/bookings/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ request_id: requestId, truck_id: truckId })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          showToast(errData.detail || "Booking failed", "error");
+          return;
+        }
+
+        const booking = await res.json();
+        showToast(`Booking ${booking.id} confirmed! Coordination Pass issued.`, "success");
+
+        // Refresh state
+        await fetchStats();
+        await fetchTrucks();
+        await fetchRequests();
+        await fetchBookings();
+
+        // Open coordination pass modal
+        openPassModal(booking);
+
+      } catch (err) {
+        showToast("Error processing booking: " + err.message, "error");
+      }
+    }
+
+    async function handleCancelBooking(bookingId) {
+      if (!confirm("Are you sure you want to execute pre-departure cancellation? This will atomically restore cargo weight and volume back to the truck.")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}/cancel`, {
+          method: "POST"
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          showToast(errData.detail || "Cancellation failed", "error");
+          return;
+        }
+
+        const cancelledBooking = await res.json();
+        showToast(`Booking ${bookingId} cancelled. Spare capacity fully restored!`, "info");
+
+        closePassModal();
+        await fetchStats();
+        await fetchTrucks();
+        await fetchRequests();
+        await fetchBookings();
+
+      } catch (err) {
+        showToast("Error cancelling booking: " + err.message, "error");
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Modal & Coordination Pass Details
+    // -----------------------------------------------------------------------
+    function openPassModal(booking) {
+      const p = booking.coordination_pass;
+      const modal = document.getElementById("pass-modal");
+      const content = document.getElementById("modal-pass-content");
+
+      const isCancelled = booking.status === "CANCELLED";
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <!-- Status Banner -->
+          <div class="flex items-center justify-between p-3 rounded-xl ${isCancelled ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full ${isCancelled ? 'bg-red-500' : 'bg-emerald-500'}"></span>
+              <span class="font-bold text-xs uppercase">Booking Status: ${booking.status}</span>
+            </div>
+            <span class="font-mono text-xs font-semibold">Pass ID: ${p.pass_id}</span>
+          </div>
+
+          <!-- Unmasked Contact Callout -->
+          <div class="bg-blue-50 rounded-2xl p-4 border border-blue-200 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-blue-700 tracking-wider">Unmasked Driver Contact (Direct Dispatch)</span>
+              <h4 class="text-xl font-mono font-extrabold text-blue-950 mt-0.5">${p.unmasked_phone}</h4>
+              <p class="text-xs text-blue-800">${p.transporter_name} &bull; ${p.driver_name}</p>
+            </div>
+            <a href="tel:${p.unmasked_phone}" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+              <span>Call Driver</span>
+            </a>
+          </div>
+
+          <!-- Corridor Transit Details -->
+          <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div>
+              <span class="text-slate-400 block text-[11px]">Shipper Organization</span>
+              <span class="font-bold text-slate-800">${p.shipper_name}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Assigned Vehicle</span>
+              <span class="font-bold text-slate-800">${p.vehicle_body}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Pickup Stop</span>
+              <span class="font-bold text-slate-900">${p.pickup_stop}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Drop Destination</span>
+              <span class="font-bold text-slate-900">${p.drop_stop}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Date & Operational Window</span>
+              <span class="font-bold text-slate-900">${p.date} &bull; ${p.scheduled_window}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[11px]">Cargo Specification</span>
+              <span class="font-bold text-slate-900">${p.weight_kg} kg / ${p.volume_m3} m³ (${p.cargo_type})</span>
+            </div>
+          </div>
+
+          <!-- Before / After Capacity Snapshot -->
+          <div class="p-3.5 bg-slate-100 rounded-xl space-y-1.5 text-xs">
+            <span class="text-[11px] font-bold text-slate-700 uppercase">Capacity Deduction Audit</span>
+            <div class="flex justify-between text-slate-600">
+              <span>Before Booking:</span>
+              <span class="font-mono">${p.before_capacity.weight_kg} kg / ${p.before_capacity.volume_m3} m³</span>
+            </div>
+            <div class="flex justify-between font-bold text-slate-900">
+              <span>After Booking (Remaining):</span>
+              <span class="font-mono text-emerald-700">${p.after_capacity.weight_kg} kg / ${p.after_capacity.volume_m3} m³</span>
+            </div>
+          </div>
+
+          <!-- Digital Verification Stamp -->
+          <div class="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl font-mono text-xs">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Verification Hash</span>
+              <span class="text-emerald-400 font-bold tracking-wider">${p.verification_code}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Issued Timestamp</span>
+              <span class="text-slate-300 text-[11px]">${p.issued_at.slice(0, 19).replace('T', ' ')}</span>
+            </div>
+          </div>
+
+          <!-- Pre-Departure Cancel Protection Button -->
+          ${!isCancelled ? `
+            <div class="pt-2">
+              <button onclick="handleCancelBooking('${booking.id}')" class="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl border border-red-200 transition-colors flex items-center justify-center space-x-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Pre-Departure Cancel (Restore Truck Capacity)</span>
+              </button>
+            </div>
+          ` : ''}
+
+        </div>
+      `;
+
+      modal.classList.remove("hidden");
+    }
+
+    function closePassModal() {
+      document.getElementById("pass-modal").classList.add("hidden");
+    }
+
+    // -----------------------------------------------------------------------
+    // Render Full Bookings Ledger
+    // -----------------------------------------------------------------------
+    function renderBookingsLedger(bookings) {
+      const container = document.getElementById("bookings-ledger-container");
+      if (!bookings.length) {
+        container.innerHTML = `
+          <div class="p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+            No passes issued yet. Match and book capacity from the "Corridor Matches" view.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = bookings.map(b => {
+        const p = b.coordination_pass;
+        const isCancelled = b.status === "CANCELLED";
+
+        return `
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <div class="space-y-1.5">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-xs bg-slate-900 text-white px-2 py-0.5 rounded">${p.pass_id}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-bold ${isCancelled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}">
+                  ${b.status}
+                </span>
+                <span class="text-xs text-slate-400">&bull;</span>
+                <span class="text-xs text-slate-500 font-mono">${p.verification_code}</span>
+              </div>
+
+              <h4 class="font-display font-bold text-base text-slate-900">${p.shipper_name} &rarr; ${p.transporter_name}</h4>
+              
+              <p class="text-xs text-slate-600">
+                <strong>${p.pickup_stop}</strong> &rarr; <strong>${p.drop_stop}</strong> &bull;
+                <span class="text-slate-500">${p.date} (${p.scheduled_window})</span> &bull;
+                <span class="font-semibold text-emerald-700">${p.weight_kg}kg / ${p.volume_m3}m³</span>
+              </p>
+            </div>
+
+            <div class="flex items-center space-x-3">
+              <div class="text-right hidden sm:block">
+                <span class="text-[10px] text-slate-400 block uppercase">Unmasked Driver Phone</span>
+                <span class="font-mono font-bold text-xs text-blue-700">${p.unmasked_phone}</span>
+              </div>
+
+              <button onclick='openPassModal(${JSON.stringify(b)})' class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors">
+                View Pass
+              </button>
+
+              ${!isCancelled ? `
+                <button onclick="handleCancelBooking('${b.id}')" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl border border-red-200 transition-colors">
+                  Cancel
+                </button>
+              ` : ''}
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    // -----------------------------------------------------------------------
+    // Form Handlers: Create Shipment Request
+    // -----------------------------------------------------------------------
+    async function handleCreateShipment(e) {
+      e.preventDefault();
+
+      const pickup = document.getElementById("req-pickup").value.trim();
+      const drop = document.getElementById("req-drop").value.trim();
+
+      if (pickup.toLowerCase() === drop.toLowerCase()) {
+        showToast("Pickup and Drop locations cannot be identical!", "error");
+        document.getElementById("route-error-badge").classList.remove("hidden");
+        return;
+      }
+
+      const payload = {
+        shipper_name: document.getElementById("req-shipper-name").value.trim(),
+        pickup_stop: pickup,
+        drop_stop: drop,
+        date: document.getElementById("req-date").value,
+        time_window_start: document.getElementById("req-time-start").value,
+        time_window_end: document.getElementById("req-time-end").value,
+        weight_kg: parseFloat(document.getElementById("req-weight").value),
+        volume_m3: parseFloat(document.getElementById("req-volume").value),
+        cargo_type: document.getElementById("req-cargo-type").value,
+        required_vehicle: document.getElementById("req-vehicle-body").value,
+      };
+
+      try {
+        const res = await fetch("/api/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.detail || "Failed to create shipment request", "error");
+          return;
+        }
+
+        const newReq = await res.json();
+        showToast(`Request ${newReq.id} created successfully!`, "success");
+
+        await fetchRequests();
+        inspectMatchesForRequest(newReq.id);
+
+      } catch (err) {
+        showToast("Error creating request: " + err.message, "error");
+      }
+    }
+
+    function swapShipmentStops() {
+      const p = document.getElementById("req-pickup");
+      const d = document.getElementById("req-drop");
+      const temp = p.value;
+      p.value = d.value;
+      d.value = temp;
+      validateStopsLive();
+    }
+
+    function validateStopsLive() {
+      const p = document.getElementById("req-pickup").value;
+      const d = document.getElementById("req-drop").value;
+      const badge = document.getElementById("route-error-badge");
+      if (p.toLowerCase() === d.toLowerCase()) {
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Form Handlers: Publish Truck Capacity
+    // -----------------------------------------------------------------------
+    async function handlePublishTruck(e) {
+      e.preventDefault();
+
+      if (currentTruckStops.length < 2) {
+        showToast("Truck route must contain at least 2 stops!", "error");
+        return;
+      }
+
+      const cargoCheckboxes = document.querySelectorAll('input[name="trk-cargo"]:checked');
+      const allowedCargo = Array.from(cargoCheckboxes).map(c => c.value);
+
+      if (!allowedCargo.length) {
+        showToast("Select at least one permitted cargo category!", "error");
+        return;
+      }
+
+      const payload = {
+        transporter_name: document.getElementById("trk-transporter-name").value.trim(),
+        phone: document.getElementById("trk-phone").value.trim(),
+        vehicle_body: document.getElementById("trk-vehicle-body").value,
+        date: document.getElementById("trk-date").value,
+        route_stops: currentTruckStops,
+        time_window_start: document.getElementById("trk-time-start").value,
+        time_window_end: document.getElementById("trk-time-end").value,
+        available_weight_kg: parseFloat(document.getElementById("trk-avail-weight").value),
+        available_volume_m3: parseFloat(document.getElementById("trk-avail-volume").value),
+        allowed_cargo: allowedCargo,
+      };
+
+      try {
+        const res = await fetch("/api/trucks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.detail || "Failed to publish truck", "error");
+          return;
+        }
+
+        const newTruck = await res.json();
+        showToast(`Truck ${newTruck.id} published to corridor!`, "success");
+
+        await fetchStats();
+        await fetchTrucks();
+        switchTab("dashboard");
+
+      } catch (err) {
+        showToast("Error publishing truck: " + err.message, "error");
+      }
+    }
+
+    function renderTruckStopsChips() {
+      const container = document.getElementById("truck-stops-chips");
+      const countEl = document.getElementById("route-stops-count");
+      if (!container) return;
+
+      countEl.innerText = `${currentTruckStops.length} Stops`;
+
+      container.innerHTML = currentTruckStops.map((stop, i) => `
+        <span class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-300">
+          <span class="text-[10px] text-slate-400">${i + 1}.</span>
+          <span>${stop}</span>
+          <button type="button" onclick="removeRouteStop(${i})" class="text-slate-400 hover:text-red-500 font-bold ml-1">&times;</button>
+        </span>
+      `).join('');
+    }
+
+    function addRouteStop(stopName) {
+      if (!currentTruckStops.includes(stopName)) {
+        currentTruckStops.push(stopName);
+        renderTruckStopsChips();
+      }
+    }
+
+    function removeRouteStop(idx) {
+      if (currentTruckStops.length > 2) {
+        currentTruckStops.splice(idx, 1);
+        renderTruckStopsChips();
+      } else {
+        showToast("A route corridor must have at least 2 stops.", "error");
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Quick Box-to-Volume Calculator Logic
+    // -----------------------------------------------------------------------
+    const boxPresets = {
+      "auto-spares": { len: 45, wid: 35, hgt: 30, wt: 12 },
+      "fmcg-medium": { len: 50, wid: 40, hgt: 40, wt: 15 },
+      "bulk-industrial": { len: 60, wid: 50, hgt: 50, wt: 25 },
+      "textile-bale": { len: 70, wid: 50, hgt: 40, wt: 18 },
+    };
+
+    function runBoxCalculator() {
+      const presetKey = document.getElementById("calc-preset").value;
+      const customRow = document.getElementById("calc-custom-row");
+      const count = parseInt(document.getElementById("calc-count").value) || 1;
+
+      let len, wid, hgt, avgWt;
+
+      if (presetKey === "custom") {
+        customRow.classList.remove("hidden");
+        customRow.classList.add("grid");
+        len = parseFloat(document.getElementById("calc-len").value) || 40;
+        wid = parseFloat(document.getElementById("calc-wid").value) || 30;
+        hgt = parseFloat(document.getElementById("calc-hgt").value) || 30;
+        avgWt = 10;
+      } else {
+        customRow.classList.add("hidden");
+        customRow.classList.remove("grid");
+        const spec = boxPresets[presetKey] || boxPresets["auto-spares"];
+        len = spec.len;
+        wid = spec.wid;
+        hgt = spec.hgt;
+        avgWt = spec.wt;
+      }
+
+      // Volume = L x W x H in cm3 / 1,000,000 = m3
+      const singleVolM3 = (len * wid * hgt) / 1000000;
+      const totalVolM3 = Math.max(0.05, singleVolM3 * count);
+      const totalWtKg = avgWt * count;
+
+      document.getElementById("calc-single-vol").innerText = `${singleVolM3.toFixed(3)} m³`;
+      document.getElementById("calc-result-vol").innerText = `${totalVolM3.toFixed(2)} m³`;
+      document.getElementById("calc-result-wt").innerText = `${Math.round(totalWtKg)} kg`;
+    }
+
+    function setBoxCount(n) {
+      document.getElementById("calc-count").value = n;
+      runBoxCalculator();
+    }
+
+    function applyCalculatorToForm() {
+      const vol = parseFloat(document.getElementById("calc-result-vol").innerText);
+      const wt = parseFloat(document.getElementById("calc-result-wt").innerText);
+      
+      document.getElementById("req-volume").value = vol.toFixed(1);
+      document.getElementById("req-weight").value = wt;
+      
+      showToast(`Applied ${wt} kg and ${vol.toFixed(1)} m³ to Shipment Request Form!`, "success");
+    }
+
+    // -----------------------------------------------------------------------
+    // Preload Scenario Helpers
+    // -----------------------------------------------------------------------
+    function fillSampleShipperRequest() {
+      document.getElementById("req-shipper-name").value = "Pimpri Auto Spares Pvt Ltd";
+      document.getElementById("req-pickup").value = "Pimpri";
+      document.getElementById("req-drop").value = "Panvel";
+      document.getElementById("req-date").value = "2026-10-20";
+      document.getElementById("req-time-start").value = "08:00";
+      document.getElementById("req-time-end").value = "10:30";
+      document.getElementById("req-weight").value = "600";
+      document.getElementById("req-volume").value = "3.5";
+      document.getElementById("req-cargo-type").value = "Auto Parts";
+      document.getElementById("req-vehicle-body").value = "Closed Container";
+      validateStopsLive();
+      showToast("Filled Pimpri Auto Spares corridor parameters.", "info");
+    }
+
+    function fillSampleTruckPublish() {
+      document.getElementById("trk-transporter-name").value = "Kalyani Freight Lines";
+      document.getElementById("trk-phone").value = "+91 98220-11223";
+      document.getElementById("trk-vehicle-body").value = "19ft Closed Container";
+      document.getElementById("trk-date").value = "2026-10-20";
+      currentTruckStops = ["Pune", "Pimpri", "Talegaon", "Panvel", "Thane"];
+      renderTruckStopsChips();
+      document.getElementById("trk-time-start").value = "07:30";
+      document.getElementById("trk-time-end").value = "11:30";
+      document.getElementById("trk-avail-weight").value = "1500";
+      document.getElementById("trk-avail-volume").value = "9.5";
+      showToast("Loaded Kalyani Freight corridor details.", "info");
+    }
+
+    function loadSampleScenario() {
+      fillSampleShipperRequest();
+      switchTab("matches");
+      showToast("Loaded Pune-Mumbai highway scenario with TRK-101 and TRK-108.", "info");
+    }
+  </script>
+</body>
+</html>
