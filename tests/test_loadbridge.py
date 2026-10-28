@@ -420,3 +420,125 @@ def test_api_stats():
     assert "active_trucks" in stats
     assert "total_available_weight_kg" in stats
     assert "corridor" in stats
+
+
+# ============================================================================
+# Telemetry & Live Map Corridor Route Tracking Tests
+# ============================================================================
+
+def test_telemetry_endpoint_bounding_box():
+    """
+    Verifies that GET /api/trucks/{truck_id}/telemetry returns valid coordinates
+    strictly within the Pune — Mumbai NH-48 corridor bounding box:
+    Latitude: [18.4, 19.3], Longitude: [72.7, 74.0]
+    """
+    res = client.get("/api/trucks/TRK-101/telemetry")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["truck_id"] == "TRK-101"
+    assert data["status"] in ["Docked at Origin", "In Transit", "Delivered"]
+    assert 0.0 <= data["progress_ratio"] <= 1.0
+
+    # Strict corridor bounding box validation
+    assert 18.4 <= data["current_lat"] <= 19.3, f"Latitude {data['current_lat']} outside corridor bounding box"
+    assert 72.7 <= data["current_lng"] <= 74.0, f"Longitude {data['current_lng']} outside corridor bounding box"
+
+    assert data["total_distance_km"] > 50.0  # Pune to Mumbai is ~140km
+    assert 0.0 <= data["distance_covered_km"] <= data["total_distance_km"]
+    assert "corridor_waypoints" in data
+    assert len(data["corridor_waypoints"]) == 5  # Pune, Pimpri, Lonavala, Panvel, Mumbai
+
+
+def test_telemetry_initial_stop_boundary_docked():
+    """
+    Boundary 1: Before departure time window (simulated time < start time).
+    Status must be 'Docked at Origin', speed 0, distance 0, and coordinates at origin stop.
+    """
+    # TRK-101 window is 09:00 - 11:00. Query at 08:30 (before departure)
+    res = client.get("/api/trucks/TRK-101/telemetry?simulated_time=08:30")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["status"] == "Docked at Origin"
+    assert data["progress_ratio"] == 0.0
+    assert data["progress_pct"] == 0.0
+    assert data["distance_covered_km"] == 0.0
+    assert data["speed_kmh"] == 0.0
+    # Coordinates must equal origin stop (Pune: 18.5204, 73.8567)
+    assert data["current_lat"] == 18.5204
+    assert data["current_lng"] == 73.8567
+    assert data["next_stop"] == "Pimpri"
+    assert "Docked at Pune" in data["current_location"]
+    assert data["eta"] == "11:00"
+
+    # Also test explicit progress=0.0
+    res_zero = client.get("/api/trucks/TRK-101/telemetry?progress=0.0")
+    assert res_zero.status_code == 200
+    assert res_zero.json()["status"] == "Docked at Origin"
+
+
+def test_telemetry_intermediate_transit():
+    """
+    Boundary 2: Active transit within time window.
+    Status must be 'In Transit', speed > 0, distance covered > 0, coordinates interpolated along polyline.
+    """
+    # Mid-window at 10:00 (50% of 09:00 - 11:00 window)
+    res = client.get("/api/trucks/TRK-101/telemetry?simulated_time=10:00")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["status"] == "In Transit"
+    assert data["progress_ratio"] == pytest.approx(0.5, abs=0.02)
+    assert data["progress_pct"] == pytest.approx(50.0, abs=2.0)
+    assert data["speed_kmh"] > 0.0
+    assert 0.0 < data["distance_covered_km"] < data["total_distance_km"]
+    assert data["remaining_distance_km"] > 0.0
+    assert data["next_stop"] in ["Pimpri", "Lonavala", "Panvel", "Mumbai"]
+
+    # Coordinates must lie inside the intermediate corridor envelope
+    assert 18.5 <= data["current_lat"] <= 19.1
+    assert 73.0 <= data["current_lng"] <= 73.9
+
+    # Query with explicit intermediate progress ratio 0.25
+    res_prog = client.get("/api/trucks/TRK-101/telemetry?progress=0.25")
+    assert res_prog.status_code == 200
+    data_prog = res_prog.json()
+    assert data_prog["status"] == "In Transit"
+    assert data_prog["progress_pct"] == 25.0
+
+
+def test_telemetry_final_delivery_boundary():
+    """
+    Boundary 3: After completion of time window (simulated time >= end time).
+    Status must be 'Delivered', speed 0, distance covered equals total distance, coordinates at destination stop.
+    """
+    # Query at 11:30 (after 11:00 scheduled completion)
+    res = client.get("/api/trucks/TRK-101/telemetry?simulated_time=11:30")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["status"] == "Delivered"
+    assert data["progress_ratio"] == 1.0
+    assert data["progress_pct"] == 100.0
+    assert data["speed_kmh"] == 0.0
+    assert data["distance_covered_km"] == pytest.approx(data["total_distance_km"])
+    assert data["remaining_distance_km"] == 0.0
+    # Coordinates must equal destination stop (Mumbai: 18.9515, 72.9499)
+    assert data["current_lat"] == 18.9515
+    assert data["current_lng"] == 72.9499
+    assert data["eta"] == "Delivered"
+    assert "Delivered at Mumbai" in data["current_location"]
+
+    # Also test explicit progress=1.0
+    res_full = client.get("/api/trucks/TRK-101/telemetry?progress=1.0")
+    assert res_full.status_code == 200
+    assert res_full.json()["status"] == "Delivered"
+
+
+def test_telemetry_nonexistent_truck_404():
+    """Requesting telemetry for an unlisted truck must return 404 Not Found."""
+    res = client.get("/api/trucks/TRK-NONEXISTENT/telemetry")
+    assert res.status_code == 404
+    assert "not found" in res.json()["detail"].lower()
+

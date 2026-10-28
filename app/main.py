@@ -5,7 +5,7 @@ FastAPI Application & RESTful API Service
 
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -20,6 +20,7 @@ from app.matching_engine import (
     MatchResult,
     Booking,
     BookingConfirmRequest,
+    TruckTelemetry,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -94,6 +95,41 @@ def get_truck_by_id(truck_id: str):
             detail=f"Truck listing '{truck_id}' not found.",
         )
     return truck
+
+
+@app.get("/api/trucks/{truck_id}/telemetry", response_model=TruckTelemetry, tags=["Transporters", "Telemetry"])
+def get_truck_telemetry(
+    truck_id: str,
+    simulated_time: Optional[str] = None,
+    progress: Optional[float] = None,
+):
+    """
+    Computes live/simulated telemetry based on the truck's scheduled time window:
+    - Calculates progress ratio along ordered stops polyline.
+    - Computes interpolated current latitude and longitude.
+    - Returns current estimated speed (km/h), next milestone stop, distance covered, and ETA.
+    - Status:
+        * 'Docked at Origin' if before departure (progress == 0.0)
+        * 'In Transit' if transit active (0.0 < progress < 1.0)
+        * 'Delivered' if after completion (progress >= 1.0)
+    """
+    try:
+        return platform_state.get_truck_telemetry(
+            truck_id,
+            simulated_time=simulated_time,
+            progress=progress,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
 
 
 # ============================================================================

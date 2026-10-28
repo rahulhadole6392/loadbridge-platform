@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Any, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 import uuid
 import threading
+import math
 from datetime import datetime
 
 
@@ -27,6 +28,50 @@ def _minutes_to_time(minutes: int) -> str:
     hours = (minutes // 60) % 24
     mins = minutes % 60
     return f"{hours:02d}:{mins:02d}"
+
+
+# ============================================================================
+# Corridor Geocoding & Waypoints along Pune — Mumbai Highway (NH-48)
+# ============================================================================
+
+CORRIDOR_WAYPOINTS: Dict[str, List[float]] = {
+    "pune": [18.5204, 73.8567],
+    "pimpri": [18.6298, 73.7997],
+    "talegaon": [18.7303, 73.6841],
+    "lonavala": [18.7557, 73.4091],
+    "panvel": [18.9894, 73.1175],
+    "vashi": [19.0771, 72.9986],
+    "mumbai": [18.9515, 72.9499],
+    # Additional corridor industrial gateways
+    "chakan": [18.7606, 73.8580],
+    "bhosari": [18.6279, 73.8443],
+    "thane": [19.2183, 72.9781],
+}
+
+
+def haversine_distance(coord1: Tuple[float, float], coord2: Tuple[float, float]) -> float:
+    """Computes great-circle distance between two (lat, lon) coordinates in kilometers."""
+    R = 6371.0  # Earth radius in kilometers
+    lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
+    lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2.0)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2.0)**2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return R * c
+
+
+def get_corridor_coordinate(stop_name: str) -> List[float]:
+    """Resolves GPS coordinates for a corridor stop with normalized lookup."""
+    key = stop_name.strip().lower()
+    if key in CORRIDOR_WAYPOINTS:
+        return CORRIDOR_WAYPOINTS[key]
+    for k, v in CORRIDOR_WAYPOINTS.items():
+        if k in key or key in k:
+            return v
+    # Fallback to Pune coordinates if unknown
+    return [18.5204, 73.8567]
+
 
 
 # ============================================================================
@@ -263,6 +308,170 @@ class Booking(BaseModel):
 class BookingConfirmRequest(BaseModel):
     request_id: str
     truck_id: str
+
+
+class RouteWaypoint(BaseModel):
+    stop_name: str
+    lat: float
+    lng: float
+    index: int
+
+
+class TruckTelemetry(BaseModel):
+    truck_id: str
+    status: str = Field(..., description="'Docked at Origin', 'In Transit', or 'Delivered'")
+    progress_ratio: float = Field(..., ge=0.0, le=1.0)
+    progress_pct: float = Field(..., ge=0.0, le=100.0)
+    current_lat: float
+    current_lng: float
+    current_location: str
+    speed_kmh: float
+    next_stop: str
+    distance_covered_km: float
+    total_distance_km: float
+    remaining_distance_km: float
+    eta: str
+    scheduled_window: str
+    corridor_waypoints: List[RouteWaypoint]
+    timestamp: str
+
+
+TelemetryResponse = TruckTelemetry
+
+
+def calculate_truck_telemetry(
+    truck: TruckListing,
+    simulated_time: Optional[str] = None,
+    progress: Optional[float] = None,
+) -> TruckTelemetry:
+    """
+    Computes live/simulated telemetry based on the truck's scheduled time window:
+    - Calculates progress ratio along ordered stops polyline.
+    - Computes interpolated current latitude and longitude.
+    - Returns current estimated speed (km/h), next milestone stop, distance covered, and ETA.
+    - Status:
+        * 'Docked at Origin' if before departure (progress == 0.0)
+        * 'In Transit' if transit active (0.0 < progress < 1.0)
+        * 'Delivered' if after completion (progress >= 1.0)
+    """
+    # 1. Resolve waypoints and coordinates along the ordered stops
+    waypoints: List[RouteWaypoint] = []
+    coords: List[Tuple[float, float]] = []
+    for idx, stop in enumerate(truck.route_stops):
+        c = get_corridor_coordinate(stop)
+        coords.append((c[0], c[1]))
+        waypoints.append(RouteWaypoint(stop_name=stop, lat=c[0], lng=c[1], index=idx))
+
+    # 2. Compute segment distances and total route distance
+    segment_distances = [
+        haversine_distance(coords[i], coords[i + 1])
+        for i in range(len(coords) - 1)
+    ]
+    total_dist = sum(segment_distances)
+
+    # 3. Time window metrics
+    start_min = _time_to_minutes(truck.time_window_start)
+    end_min = _time_to_minutes(truck.time_window_end)
+    window_mins = max(1, end_min - start_min)
+
+    # 4. Progress ratio calculation
+    if progress is not None:
+        prog_ratio = max(0.0, min(1.0, float(progress)))
+    elif simulated_time is not None:
+        sim_min = _time_to_minutes(simulated_time)
+        if sim_min <= start_min:
+            prog_ratio = 0.0
+        elif sim_min >= end_min:
+            prog_ratio = 1.0
+        else:
+            prog_ratio = (sim_min - start_min) / float(window_mins)
+    else:
+        now = datetime.now()
+        now_min = now.hour * 60 + now.minute + (now.second / 60.0)
+        if now_min <= start_min:
+            prog_ratio = 0.0
+        elif now_min >= end_min:
+            prog_ratio = 1.0
+        else:
+            prog_ratio = (now_min - start_min) / float(window_mins)
+
+    prog_ratio = max(0.0, min(1.0, prog_ratio))
+    prog_pct = round(prog_ratio * 100.0, 1)
+
+    # 5. Boundary & Interpolation Logic
+    if prog_ratio == 0.0:
+        status = "Docked at Origin"
+        current_lat = coords[0][0]
+        current_lng = coords[0][1]
+        distance_covered = 0.0
+        speed_kmh = 0.0
+        next_stop = truck.route_stops[1] if len(truck.route_stops) > 1 else truck.route_stops[0]
+        current_location = f"Docked at {truck.route_stops[0]} (Origin)"
+        eta = truck.time_window_end
+    elif prog_ratio >= 1.0:
+        status = "Delivered"
+        current_lat = coords[-1][0]
+        current_lng = coords[-1][1]
+        distance_covered = round(total_dist, 2)
+        speed_kmh = 0.0
+        next_stop = f"Destination Reached ({truck.route_stops[-1]})"
+        current_location = f"Delivered at {truck.route_stops[-1]}"
+        eta = "Delivered"
+    else:
+        status = "In Transit"
+        target_dist = prog_ratio * total_dist
+        distance_covered = round(target_dist, 2)
+
+        # Realistic estimated speed on NH-48 highway corridor (nominal ~ 45-65 km/h)
+        window_hours = window_mins / 60.0
+        nominal_speed = total_dist / window_hours if window_hours > 0 else 55.0
+        speed_kmh = round(max(42.0, min(70.0, nominal_speed)), 1)
+
+        # Polyline interpolation across segments
+        accum = 0.0
+        current_lat, current_lng = coords[0]
+        next_stop = truck.route_stops[1] if len(truck.route_stops) > 1 else truck.route_stops[0]
+        current_location = f"En route to {next_stop}"
+
+        for i in range(len(coords) - 1):
+            seg_d = segment_distances[i]
+            if accum + seg_d >= target_dist or i == len(coords) - 2:
+                seg_frac = (target_dist - accum) / seg_d if seg_d > 0 else 0.0
+                seg_frac = max(0.0, min(1.0, seg_frac))
+                lat = coords[i][0] + seg_frac * (coords[i + 1][0] - coords[i][0])
+                lng = coords[i][1] + seg_frac * (coords[i + 1][1] - coords[i][1])
+                current_lat = round(lat, 5)
+                current_lng = round(lng, 5)
+                next_stop = truck.route_stops[i + 1]
+                from_stop = truck.route_stops[i]
+                pct_seg = int(seg_frac * 100)
+                current_location = f"Between {from_stop} and {next_stop} ({pct_seg}%)"
+                break
+            accum += seg_d
+
+        eta = truck.time_window_end
+
+    remaining_distance = max(0.0, round(total_dist - distance_covered, 2))
+
+    return TruckTelemetry(
+        truck_id=truck.id,
+        status=status,
+        progress_ratio=round(prog_ratio, 4),
+        progress_pct=prog_pct,
+        current_lat=current_lat,
+        current_lng=current_lng,
+        current_location=current_location,
+        speed_kmh=speed_kmh,
+        next_stop=next_stop,
+        distance_covered_km=distance_covered,
+        total_distance_km=round(total_dist, 2),
+        remaining_distance_km=remaining_distance,
+        eta=eta,
+        scheduled_window=f"{truck.time_window_start} - {truck.time_window_end}",
+        corridor_waypoints=waypoints,
+        timestamp=datetime.now().isoformat(),
+    )
+
 
 
 # ============================================================================
@@ -795,6 +1004,20 @@ class PlatformState:
             # Sort newest first
             return sorted(self.bookings.values(), key=lambda b: b.created_at, reverse=True)
 
+    def get_truck_telemetry(
+        self,
+        truck_id: str,
+        simulated_time: Optional[str] = None,
+        progress: Optional[float] = None,
+    ) -> TruckTelemetry:
+        """Retrieves real-time/simulated GPS telemetry for a truck."""
+        with self._lock:
+            truck = self.trucks.get(truck_id)
+            if not truck:
+                raise ValueError(f"Truck listing '{truck_id}' not found.")
+        return calculate_truck_telemetry(truck, simulated_time=simulated_time, progress=progress)
+
 
 # Global singleton instance for the platform
 platform_state = PlatformState()
+

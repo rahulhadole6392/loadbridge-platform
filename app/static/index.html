@@ -11,6 +11,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   
+  <!-- Leaflet.js with OpenStreetMap Tiles (CDN, No API Keys Required) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -74,6 +78,23 @@
     }
     .animate-pulse-subtle {
       animation: pulse-subtle 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Leaflet Custom Marker & Pin Styling */
+    .leaflet-div-icon {
+      background: transparent !important;
+      border: none !important;
+    }
+    .leaflet-popup-content-wrapper {
+      background: #0F172A !important;
+      color: #F8FAFC !important;
+      border-radius: 12px !important;
+      font-size: 12px !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+      border: 1px solid #334155 !important;
+    }
+    .leaflet-popup-tip {
+      background: #0F172A !important;
     }
   </style>
 </head>
@@ -806,12 +827,119 @@
         <div>
           <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Audit & Dispatch Control</span>
           <h2 class="text-2xl font-display font-bold text-slate-900 mt-0.5">Digital Coordination Pass Ledger</h2>
-          <p class="text-sm text-slate-500">Atomic capacity bookings with unmasked driver contacts and pre-departure cancel protection.</p>
+          <p class="text-sm text-slate-500">Atomic capacity bookings with unmasked driver contacts, pre-departure cancel protection, and real-time corridor map tracking.</p>
         </div>
         <button onclick="fetchBookings()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl text-slate-700 transition-colors flex items-center space-x-1.5 self-start">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           <span>Refresh Ledger</span>
         </button>
+      </div>
+
+      <!-- Live Interactive Map Tracking Feature for Active Corridor Bookings -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Live Highway Corridor Tracking (NH-48)</span>
+            </div>
+            <h3 class="text-xl font-display font-bold text-slate-900 mt-0.5">Corridor Transit Route & Vehicle Telemetry</h3>
+            <p class="text-xs text-slate-500">Live GPS waypoint interpolation along Pune — Lonavala — Panvel — Mumbai freight corridor.</p>
+          </div>
+
+          <!-- Controls: Selector, Auto-refresh toggle, and Manual Refresh -->
+          <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex items-center space-x-1.5 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              <span class="text-slate-500 font-medium">Tracking:</span>
+              <select id="ledger-track-select" onchange="onLedgerTrackSelectChange(this.value)" class="bg-transparent font-bold text-slate-800 outline-none cursor-pointer">
+                <option value="TRK-101">TRK-101 (Pune &rarr; Mumbai)</option>
+              </select>
+            </div>
+
+            <!-- Auto-refresh Telemetry Toggle (every 5s) -->
+            <button id="ledger-autorefresh-btn" onclick="toggleLedgerAutoRefresh()" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">
+              <span id="ledger-autorefresh-indicator" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span id="ledger-autorefresh-text">Auto-refresh Telemetry (every 5s): OFF</span>
+            </button>
+
+            <!-- Manual Refresh Location Button -->
+            <button onclick="refreshLedgerTelemetryManual()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow flex items-center space-x-1.5 transition-colors">
+              <svg id="ledger-refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Refresh Location</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Map & Telemetry Split Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <!-- Leaflet Map Container: Height 350px -->
+          <div class="lg:col-span-2 relative rounded-2xl overflow-hidden border border-slate-300 shadow-inner bg-slate-100">
+            <div id="ledger-map" style="height: 350px; width: 100%;" class="z-10"></div>
+            <!-- Map Legend Overlay -->
+            <div class="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-md text-[11px] flex items-center space-x-3 text-slate-700">
+              <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> <span>Pickup Pin</span></span>
+              <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> <span>Drop Pin</span></span>
+              <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> <span>Live Truck</span></span>
+            </div>
+          </div>
+
+          <!-- Live Telemetry Card -->
+          <div id="ledger-telemetry-card" class="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl p-5 border border-slate-800 shadow-lg flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Vehicle Telemetry</span>
+                <h4 id="ledger-telemetry-truck-id" class="text-lg font-bold font-display text-white">TRK-101</h4>
+              </div>
+              <span id="ledger-telemetry-status-badge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center space-x-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                <span>In Transit</span>
+              </span>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                <span class="text-slate-400 block text-[10px] uppercase font-semibold">Simulated Speed</span>
+                <span id="ledger-telemetry-speed" class="text-base font-bold font-mono text-emerald-400 mt-0.5 block">54.5 km/h</span>
+              </div>
+              <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                <span class="text-slate-400 block text-[10px] uppercase font-semibold">Corridor ETA</span>
+                <span id="ledger-telemetry-eta" class="text-base font-bold font-mono text-amber-400 mt-0.5 block">11:00</span>
+              </div>
+              <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                <span class="text-slate-400 block text-[10px] uppercase font-semibold">Current Location</span>
+                <span id="ledger-telemetry-location" class="font-semibold text-slate-200 mt-0.5 block truncate text-xs">Near Lonavala</span>
+              </div>
+              <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                <span class="text-slate-400 block text-[10px] uppercase font-semibold">Next Stop</span>
+                <span id="ledger-telemetry-next-stop" class="font-semibold text-slate-200 mt-0.5 block truncate text-xs">Panvel</span>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="space-y-1.5 pt-1">
+              <div class="flex justify-between text-[11px] text-slate-400">
+                <span>Distance Covered: <strong id="ledger-telemetry-distance" class="text-white">68.2 / 141.2 km</strong></span>
+                <span id="ledger-telemetry-pct" class="font-bold text-emerald-400">48%</span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <div id="ledger-telemetry-progressbar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 48%"></div>
+              </div>
+            </div>
+
+            <!-- Advance Telemetry Tick Control -->
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Highway Node: NH-48 Expressway</span>
+              <button onclick="advanceLedgerTick()" class="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1">
+                <span>Advance +10%</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="bookings-ledger-container" class="space-y-4">
@@ -829,7 +957,7 @@
   <!-- MODAL: Digital Coordination Pass & Booking Confirmation Detail -->
   <!-- ===================================================================== -->
   <div id="pass-modal" class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-3xl max-w-xl w-full border border-slate-300 shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
+    <div class="bg-white rounded-3xl max-w-3xl w-full border border-slate-300 shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[92vh] flex flex-col">
       
       <!-- Pass Header -->
       <div class="bg-gradient-to-r from-corridor-navy via-slate-900 to-blue-950 text-white p-6 relative">
@@ -845,7 +973,7 @@
       </div>
 
       <!-- Pass Body -->
-      <div class="p-6 space-y-5" id="modal-pass-content">
+      <div class="p-6 space-y-5 overflow-y-auto flex-1 max-h-[75vh]" id="modal-pass-content">
         <!-- Rendered by JS -->
       </div>
 
@@ -930,6 +1058,9 @@
         fetchTrucks();
       } else if (tabId === "bookings") {
         fetchBookings();
+        setTimeout(() => {
+          initOrUpdateLedgerMap();
+        }, 150);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1496,6 +1627,83 @@
             </div>
           </div>
 
+          <!-- Live Transit Map & Telemetry in Pass Modal -->
+          <div class="space-y-3 pt-2 border-t border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Live Route Map & Vehicle Telemetry</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button id="modal-autorefresh-btn" onclick="toggleModalAutoRefresh('${p.truck_id}', '${p.pickup_stop}', '${p.drop_stop}')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center space-x-1 transition-colors">
+                  <span id="modal-autorefresh-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span id="modal-autorefresh-label">Auto-refresh (5s): OFF</span>
+                </button>
+                <button onclick="refreshModalTelemetryManual('${p.truck_id}', '${p.pickup_stop}', '${p.drop_stop}')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center space-x-1 transition-colors">
+                  <svg id="modal-refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>Refresh Location</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Leaflet Map Container: Height 350px -->
+            <div class="relative rounded-2xl overflow-hidden border border-slate-300 shadow-inner bg-slate-100">
+              <div id="modal-map" style="height: 350px; width: 100%;" class="z-10"></div>
+              <!-- Legend Overlay -->
+              <div class="absolute bottom-3 left-3 z-[400] bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200 shadow text-[10px] flex items-center space-x-2.5 text-slate-700">
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <span>Pickup (${p.pickup_stop})</span></span>
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> <span>Drop (${p.drop_stop})</span></span>
+                <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-blue-600"></span> <span>Live Truck</span></span>
+              </div>
+            </div>
+
+            <!-- Live Telemetry Card -->
+            <div id="modal-telemetry-card" class="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="text-[10px] uppercase font-bold text-slate-400">Status:</span>
+                  <span id="modal-tel-status-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    Loading telemetry...
+                  </span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] text-slate-400">Scheduled: </span>
+                  <span class="font-mono text-xs text-slate-200 font-bold">${p.scheduled_window}</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div class="bg-slate-800/80 p-2 rounded-lg">
+                  <span class="text-slate-400 text-[10px] block uppercase">Current Location</span>
+                  <span id="modal-tel-location" class="font-bold text-slate-200 truncate block text-xs mt-0.5">Calculating...</span>
+                </div>
+                <div class="bg-slate-800/80 p-2 rounded-lg">
+                  <span class="text-slate-400 text-[10px] block uppercase">Next Stop</span>
+                  <span id="modal-tel-next-stop" class="font-bold text-slate-200 truncate block text-xs mt-0.5">Calculating...</span>
+                </div>
+                <div class="bg-slate-800/80 p-2 rounded-lg">
+                  <span class="text-slate-400 text-[10px] block uppercase">Simulated Speed</span>
+                  <span id="modal-tel-speed" class="font-mono font-bold text-emerald-400 block text-xs mt-0.5">-- km/h</span>
+                </div>
+                <div class="bg-slate-800/80 p-2 rounded-lg">
+                  <span class="text-slate-400 text-[10px] block uppercase">Corridor ETA</span>
+                  <span id="modal-tel-eta" class="font-mono font-bold text-amber-400 block text-xs mt-0.5">--</span>
+                </div>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                  <span>Transit Progress: <strong id="modal-tel-pct" class="text-white">0%</strong></span>
+                  <span id="modal-tel-dist">0 km</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div id="modal-tel-progressbar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Before / After Capacity Snapshot -->
           <div class="p-3.5 bg-slate-100 rounded-xl space-y-1.5 text-xs">
             <span class="text-[11px] font-bold text-slate-700 uppercase">Capacity Deduction Audit</span>
@@ -1535,9 +1743,20 @@
       `;
 
       modal.classList.remove("hidden");
+      setTimeout(() => {
+        initOrUpdateModalMap(p.truck_id, p.pickup_stop, p.drop_stop);
+      }, 100);
     }
 
     function closePassModal() {
+      if (modalAutoRefreshInterval) {
+        clearInterval(modalAutoRefreshInterval);
+        modalAutoRefreshInterval = null;
+      }
+      if (modalMap) {
+        modalMap.remove();
+        modalMap = null;
+      }
       document.getElementById("pass-modal").classList.add("hidden");
     }
 
@@ -1586,6 +1805,11 @@
                 <span class="text-[10px] text-slate-400 block uppercase">Unmasked Driver Phone</span>
                 <span class="font-mono font-bold text-xs text-blue-700">${p.unmasked_phone}</span>
               </div>
+
+              <button onclick='trackBookingOnLedgerMap("${b.id}")' class="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 transition-colors flex items-center space-x-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                <span>Track on Map</span>
+              </button>
 
               <button onclick='openPassModal(${JSON.stringify(b)})' class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors">
                 View Pass
@@ -1860,6 +2084,527 @@
       switchTab("matches");
       showToast("Loaded Pune-Mumbai highway scenario with TRK-101 and TRK-108.", "info");
     }
+
+    // =======================================================================
+    // Leaflet Map & Corridor Live Telemetry Engine (NH-48)
+    // =======================================================================
+    let ledgerMap = null;
+    let ledgerRouteLine = null;
+    let ledgerTruckMarker = null;
+    let ledgerPickupMarker = null;
+    let ledgerDropMarker = null;
+    let ledgerWaypointMarkers = [];
+    let ledgerAutoRefreshInterval = null;
+    let ledgerActiveTruckId = "TRK-101";
+
+    let modalMap = null;
+    let modalRouteLine = null;
+    let modalTruckMarker = null;
+    let modalPickupMarker = null;
+    let modalDropMarker = null;
+    let modalWaypointMarkers = [];
+    let modalAutoRefreshInterval = null;
+    let modalActiveTruckId = null;
+    let modalActivePickup = null;
+    let modalActiveDrop = null;
+
+    const simProgressMap = {
+      "TRK-101": 0.48,
+      "TRK-108": 0.35,
+    };
+
+    function getSimulatedProgress(truckId) {
+      if (simProgressMap[truckId] === undefined) {
+        simProgressMap[truckId] = 0.42;
+      }
+      return simProgressMap[truckId];
+    }
+
+    function advanceTruckProgress(truckId, delta = 0.05) {
+      let cur = getSimulatedProgress(truckId) + delta;
+      if (cur > 1.0) cur = 0.04; // Loop back towards origin
+      simProgressMap[truckId] = Math.round(cur * 100) / 100;
+      return simProgressMap[truckId];
+    }
+
+    function createPickupMarkerIcon(label) {
+      return L.divIcon({
+        className: 'custom-pin-pickup',
+        html: `
+          <div class="flex flex-col items-center pointer-events-auto transform -translate-x-1/2 -translate-y-full">
+            <div class="px-2 py-0.5 bg-emerald-700 text-white rounded text-[10px] font-bold shadow whitespace-nowrap mb-0.5 border border-emerald-500">
+              Pickup: ${label}
+            </div>
+            <div class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-lg border-2 border-white ring-2 ring-emerald-400">
+              P
+            </div>
+            <div class="w-1 h-2 bg-emerald-800"></div>
+          </div>
+        `,
+        iconSize: [28, 40],
+        iconAnchor: [14, 40],
+      });
+    }
+
+    function createDropMarkerIcon(label) {
+      return L.divIcon({
+        className: 'custom-pin-drop',
+        html: `
+          <div class="flex flex-col items-center pointer-events-auto transform -translate-x-1/2 -translate-y-full">
+            <div class="px-2 py-0.5 bg-rose-700 text-white rounded text-[10px] font-bold shadow whitespace-nowrap mb-0.5 border border-rose-500">
+              Drop: ${label}
+            </div>
+            <div class="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold text-xs shadow-lg border-2 border-white ring-2 ring-rose-400">
+              D
+            </div>
+            <div class="w-1 h-2 bg-rose-800"></div>
+          </div>
+        `,
+        iconSize: [28, 40],
+        iconAnchor: [14, 40],
+      });
+    }
+
+    function createAnimatedTruckIcon(truckId, status) {
+      const isTransit = status === "In Transit";
+      const isDelivered = status === "Delivered";
+      const bgCol = isTransit ? 'bg-blue-600 ring-2 ring-blue-300' : (isDelivered ? 'bg-purple-600 ring-2 ring-purple-300' : 'bg-amber-600 ring-2 ring-amber-300');
+      return L.divIcon({
+        className: 'custom-pin-truck',
+        html: `
+          <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2">
+            ${isTransit ? '<span class="absolute w-12 h-12 rounded-full bg-blue-500/30 animate-ping"></span>' : ''}
+            ${isTransit ? '<span class="absolute w-9 h-9 rounded-full bg-blue-500/40 animate-pulse"></span>' : ''}
+            <div class="relative w-8 h-8 rounded-full ${bgCol} text-white flex items-center justify-center shadow-2xl border-2 border-white">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+              </svg>
+            </div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+    }
+
+    async function fetchTelemetryData(truckId, forceProgress = null) {
+      try {
+        let url = `/api/trucks/${encodeURIComponent(truckId)}/telemetry`;
+        const prog = forceProgress !== null ? forceProgress : getSimulatedProgress(truckId);
+        url += `?progress=${prog}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Telemetry failed: ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        console.warn("Failed to fetch telemetry", err);
+        return null;
+      }
+    }
+
+    async function initOrUpdateLedgerMap(targetTruckId, customPickup, customDrop) {
+      if (targetTruckId) ledgerActiveTruckId = targetTruckId;
+
+      // Update selector
+      const selectEl = document.getElementById("ledger-track-select");
+      if (selectEl) {
+        const options = [];
+        if (appBookings && appBookings.length) {
+          appBookings.forEach(b => {
+            const p = b.coordination_pass;
+            options.push(`<option value="${p.truck_id}" ${p.truck_id === ledgerActiveTruckId ? 'selected' : ''}>${p.booking_id} (${p.truck_id}: ${p.pickup_stop} &rarr; ${p.drop_stop})</option>`);
+          });
+        }
+        if (appTrucks && appTrucks.length) {
+          appTrucks.forEach(t => {
+            if (!options.some(opt => opt.includes(`value="${t.id}"`))) {
+              options.push(`<option value="${t.id}" ${t.id === ledgerActiveTruckId ? 'selected' : ''}>${t.id} (${t.route_stops[0]} &rarr; ${t.route_stops[t.route_stops.length - 1]})</option>`);
+            }
+          });
+        }
+        if (!options.length) {
+          options.push(`<option value="TRK-101">TRK-101 (Pune &rarr; Mumbai)</option>`);
+        }
+        selectEl.innerHTML = options.join('');
+        if (ledgerActiveTruckId) selectEl.value = ledgerActiveTruckId;
+      }
+
+      const mapContainer = document.getElementById("ledger-map");
+      if (!mapContainer) return;
+
+      if (!ledgerMap) {
+        ledgerMap = L.map('ledger-map', { zoomControl: true, scrollWheelZoom: false }).setView([18.75, 73.4], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(ledgerMap);
+      }
+
+      await updateLedgerTelemetry(ledgerActiveTruckId, customPickup, customDrop);
+      setTimeout(() => {
+        if (ledgerMap) ledgerMap.invalidateSize();
+      }, 200);
+    }
+
+    function onLedgerTrackSelectChange(truckId) {
+      ledgerActiveTruckId = truckId;
+      updateLedgerTelemetry(truckId);
+    }
+
+    async function updateLedgerTelemetry(truckId, customPickup, customDrop) {
+      const targetId = truckId || ledgerActiveTruckId || "TRK-101";
+      const tel = await fetchTelemetryData(targetId);
+      if (!tel || !ledgerMap) return;
+
+      // 1. Draw route polyline
+      const coords = tel.corridor_waypoints.map(w => [w.lat, w.lng]);
+      if (ledgerRouteLine) {
+        ledgerRouteLine.setLatLngs(coords);
+      } else {
+        ledgerRouteLine = L.polyline(coords, {
+          color: '#2563EB',
+          weight: 5,
+          opacity: 0.85,
+          dashArray: '8, 8',
+          lineCap: 'round'
+        }).addTo(ledgerMap);
+      }
+
+      // 2. Waypoint dots
+      ledgerWaypointMarkers.forEach(m => m.remove());
+      ledgerWaypointMarkers = [];
+      tel.corridor_waypoints.forEach(w => {
+        const dot = L.circleMarker([w.lat, w.lng], {
+          radius: 4,
+          color: '#1E293B',
+          fillColor: '#94A3B8',
+          fillOpacity: 0.9,
+          weight: 1
+        }).bindTooltip(`${w.stop_name} (Milestone)`, { direction: 'top' }).addTo(ledgerMap);
+        ledgerWaypointMarkers.push(dot);
+      });
+
+      // 3. Pickup & Drop markers
+      let pStop = customPickup;
+      let dStop = customDrop;
+      if (!pStop || !dStop) {
+        const matched = appBookings.find(b => b.truck_id === targetId && b.status === "CONFIRMED");
+        if (matched) {
+          pStop = matched.coordination_pass.pickup_stop;
+          dStop = matched.coordination_pass.drop_stop;
+        } else {
+          pStop = tel.corridor_waypoints[0].stop_name;
+          dStop = tel.corridor_waypoints[tel.corridor_waypoints.length - 1].stop_name;
+        }
+      }
+      const pW = tel.corridor_waypoints.find(w => w.stop_name.toLowerCase() === (pStop || '').toLowerCase()) || tel.corridor_waypoints[0];
+      const dW = tel.corridor_waypoints.find(w => w.stop_name.toLowerCase() === (dStop || '').toLowerCase()) || tel.corridor_waypoints[tel.corridor_waypoints.length - 1];
+
+      if (ledgerPickupMarker) {
+        ledgerPickupMarker.setLatLng([pW.lat, pW.lng]);
+        ledgerPickupMarker.setIcon(createPickupMarkerIcon(pW.stop_name));
+      } else {
+        ledgerPickupMarker = L.marker([pW.lat, pW.lng], { icon: createPickupMarkerIcon(pW.stop_name) }).addTo(ledgerMap);
+      }
+
+      if (ledgerDropMarker) {
+        ledgerDropMarker.setLatLng([dW.lat, dW.lng]);
+        ledgerDropMarker.setIcon(createDropMarkerIcon(dW.stop_name));
+      } else {
+        ledgerDropMarker = L.marker([dW.lat, dW.lng], { icon: createDropMarkerIcon(dW.stop_name) }).addTo(ledgerMap);
+      }
+
+      // 4. Truck Marker
+      if (ledgerTruckMarker) {
+        ledgerTruckMarker.setLatLng([tel.current_lat, tel.current_lng]);
+        ledgerTruckMarker.setIcon(createAnimatedTruckIcon(tel.truck_id, tel.status));
+      } else {
+        ledgerTruckMarker = L.marker([tel.current_lat, tel.current_lng], {
+          icon: createAnimatedTruckIcon(tel.truck_id, tel.status)
+        }).addTo(ledgerMap);
+      }
+      ledgerTruckMarker.bindPopup(`<b>${tel.truck_id}</b><br><span class="text-xs font-semibold">${tel.status}</span><br>Speed: ${tel.speed_kmh} km/h<br>Next: ${tel.next_stop}`);
+
+      ledgerMap.fitBounds(ledgerRouteLine.getBounds(), { padding: [35, 35] });
+
+      // 5. Update Telemetry Card DOM
+      const idEl = document.getElementById("ledger-telemetry-truck-id");
+      if (idEl) idEl.innerText = tel.truck_id;
+
+      const badgeEl = document.getElementById("ledger-telemetry-status-badge");
+      if (badgeEl) {
+        const isTransit = tel.status === "In Transit";
+        const isDelivered = tel.status === "Delivered";
+        const sClass = isTransit
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          : (isDelivered ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30');
+        const pClass = isTransit ? 'bg-emerald-400 animate-pulse' : (isDelivered ? 'bg-purple-400' : 'bg-blue-400');
+        badgeEl.className = `px-2.5 py-1 rounded-full text-xs font-bold border flex items-center space-x-1.5 ${sClass}`;
+        badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${pClass}"></span><span>${tel.status}</span>`;
+      }
+
+      const spdEl = document.getElementById("ledger-telemetry-speed");
+      if (spdEl) spdEl.innerText = `${tel.speed_kmh} km/h`;
+
+      const etaEl = document.getElementById("ledger-telemetry-eta");
+      if (etaEl) etaEl.innerText = tel.eta;
+
+      const locEl = document.getElementById("ledger-telemetry-location");
+      if (locEl) locEl.innerText = tel.current_location;
+
+      const nxtEl = document.getElementById("ledger-telemetry-next-stop");
+      if (nxtEl) nxtEl.innerText = tel.next_stop;
+
+      const pctEl = document.getElementById("ledger-telemetry-pct");
+      if (pctEl) pctEl.innerText = `${tel.progress_pct}%`;
+
+      const distEl = document.getElementById("ledger-telemetry-distance");
+      if (distEl) distEl.innerText = `${tel.distance_covered_km} / ${tel.total_distance_km} km`;
+
+      const pbarEl = document.getElementById("ledger-telemetry-progressbar");
+      if (pbarEl) pbarEl.style.width = `${tel.progress_pct}%`;
+    }
+
+    function toggleLedgerAutoRefresh() {
+      const btn = document.getElementById("ledger-autorefresh-btn");
+      const indicator = document.getElementById("ledger-autorefresh-indicator");
+      const text = document.getElementById("ledger-autorefresh-text");
+
+      if (ledgerAutoRefreshInterval) {
+        clearInterval(ledgerAutoRefreshInterval);
+        ledgerAutoRefreshInterval = null;
+        if (indicator) indicator.className = "w-2 h-2 rounded-full bg-slate-400";
+        if (text) text.innerText = "Auto-refresh Telemetry (every 5s): OFF";
+        if (btn) {
+          btn.classList.remove("bg-emerald-600", "text-white");
+          btn.classList.add("bg-slate-100", "text-slate-700");
+        }
+        showToast("Auto-refresh disabled.", "info");
+      } else {
+        advanceTruckProgress(ledgerActiveTruckId, 0.03);
+        updateLedgerTelemetry();
+        ledgerAutoRefreshInterval = setInterval(() => {
+          advanceTruckProgress(ledgerActiveTruckId, 0.03);
+          updateLedgerTelemetry();
+        }, 5000);
+        if (indicator) indicator.className = "w-2 h-2 rounded-full bg-white animate-ping";
+        if (text) text.innerText = "Auto-refresh Telemetry (every 5s): ON";
+        if (btn) {
+          btn.classList.add("bg-emerald-600", "text-white");
+          btn.classList.remove("bg-slate-100", "text-slate-700");
+        }
+        showToast("Auto-refresh active (polling telemetry every 5s).", "success");
+      }
+    }
+
+    async function refreshLedgerTelemetryManual() {
+      const icon = document.getElementById("ledger-refresh-icon");
+      if (icon) icon.classList.add("animate-spin");
+      setTimeout(() => { if (icon) icon.classList.remove("animate-spin"); }, 700);
+
+      advanceTruckProgress(ledgerActiveTruckId, 0.04);
+      await updateLedgerTelemetry();
+      showToast("Corridor vehicle position refreshed.", "success");
+    }
+
+    function advanceLedgerTick() {
+      advanceTruckProgress(ledgerActiveTruckId, 0.10);
+      updateLedgerTelemetry();
+      showToast("Advanced truck transit simulation by +10%.", "info");
+    }
+
+    async function trackBookingOnLedgerMap(bookingId) {
+      const booking = appBookings.find(b => b.id === bookingId);
+      if (!booking) return;
+
+      const p = booking.coordination_pass;
+      ledgerActiveTruckId = p.truck_id;
+      const selectEl = document.getElementById("ledger-track-select");
+      if (selectEl) selectEl.value = p.truck_id;
+
+      await updateLedgerTelemetry(p.truck_id, p.pickup_stop, p.drop_stop);
+      const mapCard = document.getElementById("ledger-map");
+      if (mapCard) {
+        mapCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      showToast(`Tracking ${p.truck_id} (${p.pickup_stop} -> ${p.drop_stop}) on corridor map.`, "info");
+    }
+
+    // Modal Map Engine
+    async function initOrUpdateModalMap(truckId, pickupStop, dropStop) {
+      modalActiveTruckId = truckId;
+      modalActivePickup = pickupStop;
+      modalActiveDrop = dropStop;
+
+      const modalMapContainer = document.getElementById("modal-map");
+      if (!modalMapContainer) return;
+
+      if (modalMap) {
+        modalMap.remove();
+        modalMap = null;
+        modalRouteLine = null;
+        modalTruckMarker = null;
+        modalPickupMarker = null;
+        modalDropMarker = null;
+        modalWaypointMarkers = [];
+      }
+
+      modalMap = L.map('modal-map', { zoomControl: true, scrollWheelZoom: false }).setView([18.75, 73.4], 9);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(modalMap);
+
+      await updateModalTelemetry(truckId, pickupStop, dropStop);
+      setTimeout(() => {
+        if (modalMap) {
+          modalMap.invalidateSize();
+          if (modalRouteLine) modalMap.fitBounds(modalRouteLine.getBounds(), { padding: [35, 35] });
+        }
+      }, 250);
+    }
+
+    async function updateModalTelemetry(truckId, pickupStop, dropStop) {
+      const targetId = truckId || modalActiveTruckId;
+      const pStop = pickupStop || modalActivePickup;
+      const dStop = dropStop || modalActiveDrop;
+
+      const tel = await fetchTelemetryData(targetId);
+      if (!tel || !modalMap) return;
+
+      // Polyline
+      const coords = tel.corridor_waypoints.map(w => [w.lat, w.lng]);
+      if (modalRouteLine) {
+        modalRouteLine.setLatLngs(coords);
+      } else {
+        modalRouteLine = L.polyline(coords, {
+          color: '#2563EB',
+          weight: 5,
+          opacity: 0.85,
+          dashArray: '8, 8',
+          lineCap: 'round'
+        }).addTo(modalMap);
+      }
+
+      // Waypoints
+      modalWaypointMarkers.forEach(m => m.remove());
+      modalWaypointMarkers = [];
+      tel.corridor_waypoints.forEach(w => {
+        const dot = L.circleMarker([w.lat, w.lng], {
+          radius: 4,
+          color: '#1E293B',
+          fillColor: '#94A3B8',
+          fillOpacity: 0.9,
+          weight: 1
+        }).bindTooltip(`${w.stop_name} (Milestone)`, { direction: 'top' }).addTo(modalMap);
+        modalWaypointMarkers.push(dot);
+      });
+
+      // Pickup & Drop
+      const pW = tel.corridor_waypoints.find(w => w.stop_name.toLowerCase() === (pStop || '').toLowerCase()) || tel.corridor_waypoints[0];
+      const dW = tel.corridor_waypoints.find(w => w.stop_name.toLowerCase() === (dStop || '').toLowerCase()) || tel.corridor_waypoints[tel.corridor_waypoints.length - 1];
+
+      if (modalPickupMarker) {
+        modalPickupMarker.setLatLng([pW.lat, pW.lng]);
+        modalPickupMarker.setIcon(createPickupMarkerIcon(pW.stop_name));
+      } else {
+        modalPickupMarker = L.marker([pW.lat, pW.lng], { icon: createPickupMarkerIcon(pW.stop_name) }).addTo(modalMap);
+      }
+
+      if (modalDropMarker) {
+        modalDropMarker.setLatLng([dW.lat, dW.lng]);
+        modalDropMarker.setIcon(createDropMarkerIcon(dW.stop_name));
+      } else {
+        modalDropMarker = L.marker([dW.lat, dW.lng], { icon: createDropMarkerIcon(dW.stop_name) }).addTo(modalMap);
+      }
+
+      // Truck marker
+      if (modalTruckMarker) {
+        modalTruckMarker.setLatLng([tel.current_lat, tel.current_lng]);
+        modalTruckMarker.setIcon(createAnimatedTruckIcon(tel.truck_id, tel.status));
+      } else {
+        modalTruckMarker = L.marker([tel.current_lat, tel.current_lng], {
+          icon: createAnimatedTruckIcon(tel.truck_id, tel.status)
+        }).addTo(modalMap);
+      }
+      modalTruckMarker.bindPopup(`<b>${tel.truck_id}</b><br><span class="text-xs font-semibold">${tel.status}</span><br>Speed: ${tel.speed_kmh} km/h`);
+
+      // Update modal telemetry card
+      const badgeEl = document.getElementById("modal-tel-status-badge");
+      if (badgeEl) {
+        const isTransit = tel.status === "In Transit";
+        const isDelivered = tel.status === "Delivered";
+        const sClass = isTransit
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          : (isDelivered ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30');
+        const pClass = isTransit ? 'bg-emerald-400 animate-pulse' : (isDelivered ? 'bg-purple-400' : 'bg-blue-400');
+        badgeEl.className = `px-2 py-0.5 rounded-full text-xs font-bold border flex items-center space-x-1 ${sClass}`;
+        badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${pClass}"></span><span>${tel.status}</span>`;
+      }
+
+      const spdEl = document.getElementById("modal-tel-speed");
+      if (spdEl) spdEl.innerText = `${tel.speed_kmh} km/h`;
+
+      const etaEl = document.getElementById("modal-tel-eta");
+      if (etaEl) etaEl.innerText = tel.eta;
+
+      const locEl = document.getElementById("modal-tel-location");
+      if (locEl) locEl.innerText = tel.current_location;
+
+      const nxtEl = document.getElementById("modal-tel-next-stop");
+      if (nxtEl) nxtEl.innerText = tel.next_stop;
+
+      const pctEl = document.getElementById("modal-tel-pct");
+      if (pctEl) pctEl.innerText = `${tel.progress_pct}%`;
+
+      const distEl = document.getElementById("modal-tel-dist");
+      if (distEl) distEl.innerText = `${tel.distance_covered_km} / ${tel.total_distance_km} km`;
+
+      const pbarEl = document.getElementById("modal-tel-progressbar");
+      if (pbarEl) pbarEl.style.width = `${tel.progress_pct}%`;
+    }
+
+    function toggleModalAutoRefresh(truckId, pickupStop, dropStop) {
+      const btn = document.getElementById("modal-autorefresh-btn");
+      const dot = document.getElementById("modal-autorefresh-dot");
+      const label = document.getElementById("modal-autorefresh-label");
+
+      if (modalAutoRefreshInterval) {
+        clearInterval(modalAutoRefreshInterval);
+        modalAutoRefreshInterval = null;
+        if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-slate-400";
+        if (label) label.innerText = "Auto-refresh (5s): OFF";
+        if (btn) {
+          btn.classList.remove("bg-emerald-600", "text-white");
+          btn.classList.add("bg-slate-100", "text-slate-700");
+        }
+        showToast("Modal auto-refresh stopped.", "info");
+      } else {
+        advanceTruckProgress(truckId, 0.03);
+        updateModalTelemetry(truckId, pickupStop, dropStop);
+        modalAutoRefreshInterval = setInterval(() => {
+          advanceTruckProgress(truckId, 0.03);
+          updateModalTelemetry(truckId, pickupStop, dropStop);
+        }, 5000);
+        if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-white animate-ping";
+        if (label) label.innerText = "Auto-refresh (5s): ON";
+        if (btn) {
+          btn.classList.add("bg-emerald-600", "text-white");
+          btn.classList.remove("bg-slate-100", "text-slate-700");
+        }
+        showToast("Modal auto-refresh active (5s interval).", "success");
+      }
+    }
+
+    async function refreshModalTelemetryManual(truckId, pickupStop, dropStop) {
+      const icon = document.getElementById("modal-refresh-icon");
+      if (icon) icon.classList.add("animate-spin");
+      setTimeout(() => { if (icon) icon.classList.remove("animate-spin"); }, 700);
+
+      advanceTruckProgress(truckId, 0.04);
+      await updateModalTelemetry(truckId, pickupStop, dropStop);
+      showToast("Live vehicle position refreshed.", "success");
+    }
+
   </script>
 </body>
 </html>
